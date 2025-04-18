@@ -252,6 +252,10 @@
                 </div> {# End card #}
             {% endfor %}
 
+            <div class="alert alert-dark mb-3" role="alert">
+                <i class="bi bi-info-circle me-2"></i> After starting, please allow 5~10 minutes for the metrics to appear in your Grafana dashboard.
+            </div>
+
             {# Button Explanations - Moved Below Buttons #}
             <p class="text-center text-muted small mt-2 mb-4" style="font-size: 0.75em;">
                 <strong class="text-primary">Save file:</strong> Writes changes to <code>env_file</code> only.<br>
@@ -266,6 +270,7 @@
                 <button type="submit" name="action" value="save_close_bootstrap" class="btn btn-success" onclick="return confirmAction('save_close_bootstrap', this.form);">Save, Close & Start</button>
             </div>
         </form>
+
     </div>
 
     <footer class="footer mt-5 py-3 bg-dark text-muted border-top border-secondary-subtle">

@@ -106,6 +106,8 @@ main() {
     echo
     echo "Bootstrap completed successfully."
     echo
+    echo "Please allow 5~10 minutes for the metrics to appear in your Grafana dashboard."
+    echo
 }
 
 # Execute main function
