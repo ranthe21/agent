@@ -156,7 +156,7 @@ if cf_api_token and cf_zone_id:
 else:
   initialized = True
 
-cf_clean_ip_domain = os.environ.get('CF_CLIENT_IP_DOMAIN', 'npmjs.com')
+cf_clean_ip_domain = os.environ.get('CF_CLEAN_IP_DOMAIN', 'npmjs.com')
 
 with open("inbounds.json") as f:
     inbound_template = string.Template(f.read())
