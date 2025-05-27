@@ -21,7 +21,7 @@ RUN apk add --no-cache --virtual .build-deps wget unzip && \
         echo "Unsupported architecture: $ARCH" >&2; \
         exit 1; \
     fi && \
-    wget -L -O knife.zip "https://github.com/lilendian0x00/xray-knife/releases/download/v3.20.45/Xray-knife-linux-${arch_name}.zip" && \
+    wget -L -O knife.zip "https://github.com/lilendian0x00/xray-knife/releases/download/v3.20.55/Xray-knife-linux-${arch_name}.zip" && \
     unzip knife.zip && \
     mv ./xray-knife /usr/bin/ && \
     rm knife.zip && \
