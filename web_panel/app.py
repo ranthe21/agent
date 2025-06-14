@@ -53,9 +53,9 @@ except Exception as e:
     print(f"Error loading or processing {INBOUNDS_JSON_PATH}: {e}")
     # Provide basic fallback if file fails to load
     direct_options = [{'name': n, 'label': n} for n in ["vless-tcp-tls-direct", "vless-hu-tls-direct", "vless-xhttp-quic-direct"]]
-    cdn_options = [{'name': n, 'label': n} for n in ["vless-hu-tls-cdn", "vless-xhttp-quic-cdn"]]
+    cdn_options = [{'name': n, 'label': n} for n in ["vmess-ws-cdn", "vless-hu-tls-cdn", "vless-xhttp-quic-cdn"]]
     # Include both direct and CDN inbounds in defaults
-    xray_inbounds_default = ["vless-tcp-tls-direct", "vless-hu-tls-direct", "vless-xhttp-quic-direct", "vless-hu-tls-cdn", "vless-xhttp-quic-cdn"]
+    xray_inbounds_default = ["vmess-ws-cdn", "vless-tcp-tls-direct", "vless-hu-tls-direct", "vless-xhttp-quic-direct", "vless-hu-tls-cdn", "vless-xhttp-quic-cdn"]
 
 # Defines the structure, types, defaults, and help text for all configuration fields.
 # This drives the web UI generation and saving logic.
