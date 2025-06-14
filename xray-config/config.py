@@ -15,7 +15,7 @@ config_uuid = os.popen(f"xray uuid -i {config_id}").read().replace("\n", "").str
 cf_api_token = os.environ.get('CF_API_TOKEN', None)
 cf_zone_id = os.environ.get('CF_ZONE_ID', None)
 nginx_path = os.environ.get('NGINX_PATH', None)
-xray_inbounds = os.environ.get("XRAY_INBOUNDS", "vless-tcp-tls-direct,vless-hu-tls-direct,vless-hu-tls-cdn,vless-xhttp-quic-direct,vless-xhttp-quic-cdn").split(",")
+xray_inbounds = os.environ.get("XRAY_INBOUNDS", "vmess-ws-cdn,vless-tcp-tls-direct,vless-hu-tls-direct,vless-hu-tls-cdn,vless-xhttp-quic-direct,vless-xhttp-quic-cdn").split(",")
 
 domain = None
 subdomain = None
@@ -301,6 +301,7 @@ if os.environ.get('XRAY_OUTBOUND') == 'warp':
     # add new routing rules at the beginning of the rules list
     xray_config['routing']['rules'].append({
         "inboundTag": [
+            "vmess-ws-cdn",
             "vless-tcp-tls-direct",
             "vless-hu-tls-direct",
             "vless-hu-tls-cdn",
