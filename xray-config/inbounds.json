@@ -1,5 +1,53 @@
 [
   {
+    "name": "vmess-ws-cdn",
+    "link": {
+      "add": "$cf_clean_ip_domain",
+      "aid": "0",
+      "host": "$subdomain",
+      "id": "$config_id",
+      "net": "ws",
+      "path": "/$nginx_path/cdn",
+      "port": "80",
+      "ps": "vmess-ws-cdn",
+      "scy": "auto",
+      "sni": "",
+      "tls": "",
+      "type": "",
+      "v": "2"
+    },
+    "cloudflare": true,
+    "inbound": {
+      "tag": "vmess-ws-cdn",
+      "listen": "0.0.0.0",
+      "port": 80,
+      "protocol": "vmess",
+      "settings": {
+        "clients": [
+          {
+            "flow": "",
+            "id": "$config_id"
+          }
+        ]
+      },
+      "streamSettings": {
+        "network": "ws",
+        "wsSettings": {
+          "path": "/$nginx_path/cdn"
+        },
+        "security": "none"
+      },
+      "sniffing": {
+        "enabled": true,
+        "destOverride": [
+          "http",
+          "tls",
+          "quic"
+        ]
+      }
+    }
+  },
+  {
     "name": "vless-tcp-tls-direct",
     "link": "vless://$config_id@$direct_subdomain:443?type=tcp&security=tls&flow=xtls-rprx-vision&fp=randomized&alpn=h2%2Chttp%2F1.1&sni=$direct_subdomain#vless-tcp-tls-direct",
     "cloudflare": false,
