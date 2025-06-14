@@ -205,7 +205,7 @@ xray_config = {
         "dnsLog": True if DEBUG else False
     },
     "routing": {
-        "domainStrategy": "IPIfNonMatch",
+        "domainStrategy": "AsIs",
         "rules": [
             {
                 "inboundTag": [
