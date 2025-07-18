@@ -72,32 +72,24 @@ services:
         max-size: "10m"
         max-file: "1"
 
-  v2ray-exporter:
+  xray-exporter:
     build:
-      context: ./v2ray-exporter
+      context: ./xray-exporter
       dockerfile: Dockerfile
     restart: always
     depends_on:
       - xray
-
-  user-metrics:
-    build:
-      context: ./user-metrics
-      dockerfile: Dockerfile
     volumes:
-      - "/var/log:/var/log:ro"
-    restart: always
+      - /var/log/compassvpn:/var/log/compassvpn:ro
+    ports:
+      - "127.0.0.1:9550:9550"
     environment:
-      - TZ=UTC
-    depends_on:
-      - xray
+      - LOG_LEVEL=info
     logging:
       driver: "json-file"
       options:
         max-size: "10m"
         max-file: "1"
-    ports:
-      - "127.0.0.1:9551:9551"
 
   metric-forwarder:
     build:
