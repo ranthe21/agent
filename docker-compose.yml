@@ -82,7 +82,7 @@ services:
     volumes:
       - /var/log/compassvpn:/var/log/compassvpn:ro
     ports:
-      - "127.0.0.1:9550:9550"
+      - "9550:9550"
     environment:
       - LOG_LEVEL=info
     logging:
