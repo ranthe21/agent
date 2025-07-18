@@ -87,11 +87,11 @@ def generate_config():
                     "metrics_path": "/metrics"
                 },
                 {
-                    "job_name": "v2ray-exporter",
+                    "job_name": "xray-exporter",
                     "static_configs": [
                         {
                             "targets": [
-                                "v2ray-exporter:9550"
+                                "xray-exporter:9550"
                             ],
                             "labels": {
                                 "donor": DONOR,
@@ -107,12 +107,12 @@ def generate_config():
                         },
                         {
                             "source_labels": ["__name__"],
-                            "regex": "v2ray_memstats_.*",
+                            "regex": "xray_memstats_.*",
                             "action": "drop"
                         },
                         {
                             "source_labels": ["__name__"],
-                            "regex": "v2ray_scrape_.*",
+                            "regex": "xray_scrape_.*",
                             "action": "drop"
                         },
                         {
@@ -127,28 +127,6 @@ def generate_config():
                         },
                     ],
                     "metrics_path": "/scrape"
-                },
-                {
-                    "job_name": "user-metrics",
-                    "static_configs": [
-                        {
-                            "targets": [
-                                "user-metrics:9551"
-                            ],
-                            "labels": {
-                                "donor": DONOR,
-                                "instance": instance_ip
-                            }
-                        }
-                    ],
-#                    "metric_relabel_configs": [
-#                        {
-#                            "source_labels": ["__name__"],
-#                            "regex": ".*",
-#                            "action": "keep"
-#                        }
-#                    ],
-                    "metrics_path": ""
                 }
             ]
           }
