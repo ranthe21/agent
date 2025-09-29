@@ -3,20 +3,14 @@
 # --- Configuration ---
 BOOTSTRAP_SCRIPT="./bootstrap.sh"
 CHECK_UPDATE_SCRIPT="./check_update.sh"
-LOG_FILES_TO_CLEAN=(
-    "/var/log/compassvpn/xray_access.log"
-    "/var/log/compassvpn/xray_error.log"
-    "/var/log/compassvpn/nginx_access.log"
-    "/var/log/compassvpn/nginx_error.log"
-    "/var/log/compassvpn/xray.log"
-)
+LOG_FILES_TO_CLEAN=()
 RENEW_INTERVAL="$1" # Read renewal interval from the first argument
 # AUTO_UPDATE environment variable is checked directly later
 
 SCRIPT_MARKER_BEGIN="# BEGIN MANAGED CRON JOBS BY setup_cron.sh"
 SCRIPT_MARKER_END="# END MANAGED CRON JOBS BY setup_cron.sh"
-# Use fixed string for log cleaning command fragment for safety with grep -F
-LOG_CLEAN_COMMAND_FRAGMENT="truncate -s 0 /var/log/xray_access.log"
+# Fixed string to remove any legacy truncate jobs
+LOG_CLEAN_COMMAND_FRAGMENT="truncate -s 0 /var/log/compassvpn/"
 # Use extended regex for bootstrap command fragment
 BOOTSTRAP_COMMAND_FRAGMENT="&& ./bootstrap.sh"
 
@@ -71,7 +65,7 @@ generate_cron_jobs() {
     local script_dir
     script_dir="$(cd "$(dirname "$0")" && pwd)" # Get absolute directory of the script
 
-    # 1. Renewal Cron Job
+    # 1) Renewal Cron Job (optional)
     if [ -n "$RENEW_INTERVAL" ]; then # Only add if interval is provided
       if validate_interval "$RENEW_INTERVAL"; then
           local schedule
@@ -87,7 +81,7 @@ generate_cron_jobs() {
         echo "Info: No RENEW_INTERVAL provided. Skipping renewal cron job setup." >&2
     fi
 
-    # 2. Auto Update Cron Job
+    # 2) Auto Update Cron Job (optional)
     if [ "$AUTO_UPDATE" == "on" ]; then
         # Ensure script_dir path is quoted if it contains spaces
         jobs+=("0 * * * * cd \"$script_dir\" && $CHECK_UPDATE_SCRIPT # Auto Update Check")
@@ -98,14 +92,7 @@ generate_cron_jobs() {
         echo "Info: AUTO_UPDATE is set to '$AUTO_UPDATE' (not 'on'). Auto-update check disabled." >&2
     fi
 
-    # 3. Log Cleaning Cron Job
-    if [ ${#LOG_FILES_TO_CLEAN[@]} -gt 0 ]; then
-        local log_clean_cmd="truncate -s 0 ${LOG_FILES_TO_CLEAN[*]}"
-        jobs+=("0 0 */2 * * $log_clean_cmd # Log Cleaning Job")
-        echo "Info: Log cleaning cron job will be scheduled every 2 days for specified files." >&2
-    else
-        echo "Info: No log files specified for cleaning. Skipping log cleaning cron job." >&2
-    fi
+    
 
 
     # Output the jobs section ONLY if any jobs were defined
