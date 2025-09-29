@@ -5,6 +5,10 @@ set -e
 # Trap errors
 trap 'echo "An error occurred. Exiting..."; exit 1' ERR
 
+# Configuration variables
+DNS_SERVERS=("1.1.1.2" "1.0.0.2" "127.0.0.53")
+REQUIRED_PORTS=("80" "8080" "443" "2053" "8443" "9100")
+
 # Paths
 HOST_PATH="/etc/hosts"
 DNS_PATH="/etc/resolv.conf"
@@ -90,15 +94,14 @@ fix_dns() {
     fi
 
     # Test DNS servers before applying
-    local dns_servers=("1.1.1.2" "1.0.0.2" "127.0.0.53")
-    for dns in "${dns_servers[@]}"; do
+    for dns in "${DNS_SERVERS[@]}"; do
         if ! ping -c 1 -W 1 "$dns" >/dev/null 2>&1; then
             echo "Warning: DNS server $dns is not responding."
         fi
     done
 
     sed -i '/nameserver/d' "$DNS_PATH"
-    for dns in "${dns_servers[@]}"; do
+    for dns in "${DNS_SERVERS[@]}"; do
         echo "nameserver $dns" >> "$DNS_PATH"
     done
 
@@ -363,7 +366,7 @@ process_fail2ban_filter() {
         return 1
     fi
     
-    # Get NGINX_PATH from env_file
+    # Extract NGINX_PATH from environment configuration
     nginx_path=$(grep -oP '^NGINX_PATH=\K.*' env_file)
     
     if [ -z "$nginx_path" ]; then
@@ -373,18 +376,17 @@ process_fail2ban_filter() {
     
     echo "Setting NGINX_PATH to $nginx_path in nginx-bad-request.conf"
     
-    # Replace NGINX_PATH in the filter
+    # Update filter configuration with environment path
     sed -i "s|NGINX_PATH|$nginx_path|g" "$filter_file"
 }
 
 # Check if required ports are in use
 check_required_ports() {
-    local ports_to_check=("80" "443" "2053" "8443")
     local conflict_found=0
 
-    echo "Checking required ports: ${ports_to_check[*]}..."
+    echo "Checking required ports: ${REQUIRED_PORTS[*]}..."
 
-    for port in "${ports_to_check[@]}"; do
+    for port in "${REQUIRED_PORTS[@]}"; do
         echo "Checking if port $port is in use..."
         # Use ss to check for listening sockets on the current TCP port
         local listening_process
@@ -412,7 +414,7 @@ check_required_ports() {
     done
 
     if [ "$conflict_found" -eq 0 ]; then
-        echo "All required ports (${ports_to_check[*]}) are free."
+        echo "All required ports (${REQUIRED_PORTS[*]}) are free."
     fi
 }
 
