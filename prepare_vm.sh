@@ -264,17 +264,14 @@ configure_ufw() {
     ufw default deny incoming >/dev/null 2>&1
     ufw default allow outgoing >/dev/null 2>&1
 
-    # Allow ports
+    # Allow SSH port
     ufw allow "$SSH_PORT/tcp" >/dev/null 2>&1
-    ufw allow 80/tcp >/dev/null 2>&1
-    ufw allow 443/tcp >/dev/null 2>&1
-    ufw allow 443/udp >/dev/null 2>&1
-    ufw allow 2053/tcp >/dev/null 2>&1
-    ufw allow 2053/udp >/dev/null 2>&1
-    ufw allow 8443/tcp >/dev/null 2>&1
-    ufw allow 8443/udp >/dev/null 2>&1
-    ufw allow 9100/tcp >/dev/null 2>&1
-    ufw allow 9100/udp >/dev/null 2>&1
+
+    # Allow required ports from array (both TCP and UDP)
+    for port in "${REQUIRED_PORTS[@]}"; do
+        ufw allow "$port/tcp" >/dev/null 2>&1
+        ufw allow "$port/udp" >/dev/null 2>&1
+    done
 
     # Enable UFW
     echo "y" | ufw enable >/dev/null 2>&1
@@ -479,6 +476,6 @@ process_fail2ban_filter
 sleep 0.5
 
 echo
-echo "VM is ready for bootstraping."
+echo "VM is ready for bootstrapping."
 echo
 exit 0
