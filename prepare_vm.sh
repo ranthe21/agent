@@ -7,7 +7,7 @@ trap 'echo "An error occurred. Exiting..."; exit 1' ERR
 
 # Configuration variables
 DNS_SERVERS=("1.1.1.2" "1.0.0.2" "127.0.0.53")
-REQUIRED_PORTS=("80" "8080" "443" "2053" "8443" "9100")
+REQUIRED_PORTS=("80" "8080" "443" "2053" "8443")
 
 # Paths
 HOST_PATH="/etc/hosts"
