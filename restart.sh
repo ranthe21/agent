@@ -1,20 +1,15 @@
 #!/usr/bin/bash
+set -euo pipefail # Fail fast on errors
 
-
-# Check if the script is run as root
 if [ "$EUID" -ne 0 ]; then
     echo "This script must be run as root."
     exit 1
 fi
 
-
-file_path="env_file"
-if [ -f $file_path ]; then
-    echo "'$file_path' exists."
-else
-    echo "'$file_path' file does not exist. use env_file.example as template"
-    exit;
+if [ ! -f "env_file" ]; then
+    echo "'env_file' does not exist. Use env_file.example as a template."
+    exit 1
 fi
 
-docker compose up -d --build
-docker compose restart
+# The single source of truth for a clean update
+docker compose up -d --build --remove-orphans

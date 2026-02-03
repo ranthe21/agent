@@ -2,74 +2,114 @@
 
 rm /run/*.pid
 
-if [ $XRAY_OUTBOUND = "warp" ]; then
-  # xray-config upstream URL
-  UPSTREAM_URL="http://xray-config:5000/warps"
+# Mock resolvconf to prevent wg-quick from breaking Docker DNS
+# This keeps the container's /etc/resolv.conf (Docker DNS) intact.
+cat <<EOF > /usr/sbin/resolvconf
+#!/bin/sh
+# No-op mock to prevent wg-quick DNS changes
+exit 0
+EOF
+chmod +x /usr/sbin/resolvconf
 
-  # Perform a GET request to the upstream
-  RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" "$UPSTREAM_URL")
+if [ "$XRAY_OUTBOUND" = "warp" ]; then
+  # xray-config upstream URL for WireGuard configs
+  WG_CONFIGS_URL="http://xray-config:5000/wg-configs"
 
-  # Check the HTTP status code of xray-config upstream
-  if [ "$RESPONSE" -eq 200 ]; then
-      echo "xray-config is ready: $UPSTREAM_URL"
-  else
-      echo "xray-config is not ready yet: $UPSTREAM_URL (HTTP status: $RESPONSE)"
-      sleep 5
+  # Wait for xray-config to be ready
+  MAX_RETRIES=30
+  RETRY_COUNT=0
+  while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+      RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" "$WG_CONFIGS_URL")
+      if [ "$RESPONSE" -eq 200 ]; then
+          echo "xray-config is ready: $WG_CONFIGS_URL"
+          break
+      fi
+      echo "Waiting for xray-config to generate WG configs... (HTTP status: $RESPONSE)"
+      sleep 2
+      RETRY_COUNT=$((RETRY_COUNT + 1))
+  done
+
+  if [ $RETRY_COUNT -eq $MAX_RETRIES ]; then
+      echo "Error: xray-config timed out"
       exit 1
   fi
 
-  WARP_CONFIGS=$(curl -s "$UPSTREAM_URL")
+  # Fetch WireGuard configs and save them locally
+  mkdir -p /etc/wireguard
+  if ! WG_CONFIGS=$(curl -sf "$WG_CONFIGS_URL"); then
+      echo "Error: Failed to fetch WireGuard configs"
+      exit 1
+  fi
 
-  mkdir -p /etc/wireguard/
+  if [ "$DEBUG" = "true" ]; then
+      echo "$WG_CONFIGS"
+  fi
 
-  echo $WARP_CONFIGS
-
-  counter=0
-  # Parse and iterate over each dictionary in the list
-  echo "$WARP_CONFIGS" | jq -c '.[]' | while read -r item; do
-      addresses=$(echo "$item" | jq -r '.addresses')
-      addr_v4=$(echo "$addresses" | jq -r '.[0]')
-      addr_v6=$(echo "$addresses" | jq -r '.[1]')
-      private_key=$(echo "$item" | jq -r '.privatekey')
-      pubkey=$(echo "$item" | jq -r '.pubkey')
-
-      WG_CONF_PATH=/etc/wireguard/wg${counter}.conf
-      cp /wg_template.conf $WG_CONF_PATH
-      sed -i "s|\${PRIVATE_KEY}|$private_key|g" "$WG_CONF_PATH"
-      sed -i "s|\${ADDR_V4}|172.16.${counter}.2|g" "$WG_CONF_PATH"
-      sed -i "s|\${ADDR_V6}|$addr_v6|g" "$WG_CONF_PATH"
-      sed -i "s|\${PUBKEY}|$pubkey|g" "$WG_CONF_PATH"
-
-      MONIT_CONF_PATH=/etc/monit.d/wg${counter}
-      cp /wg_monit /etc/monit.d/wg${counter}
-      sed -i "s|\${INTERFACE}|wg${counter}|g" "$MONIT_CONF_PATH"
-
-      counter=$((counter + 1))
+  # Extract and save each WireGuard config
+  for iface in wg0 wg1 wg2; do
+      CONFIG_CONTENT=$(echo "$WG_CONFIGS" | jq -r ".\"$iface\" // empty")
+      if [ -n "$CONFIG_CONTENT" ]; then
+          echo "$CONFIG_CONTENT" > "/etc/wireguard/${iface}.conf"
+          if [ "$DEBUG" = "true" ]; then
+              echo "Saved /etc/wireguard/${iface}.conf:"
+              echo "$CONFIG_CONTENT"
+          else
+              echo "Saved /etc/wireguard/${iface}.conf"
+          fi
+      fi
   done
 
+  # Bring up wg interfaces
+  for i in 0 1 2; do
+      if [ -f "/etc/wireguard/wg$i.conf" ]; then
+          echo "Bringing up wg$i..."
+          /usr/bin/wg-quick up "wg$i" || echo "Warning: Failed to bring up wg$i"
+          
+          MONIT_CONF_PATH="/etc/monit.d/wg$i"
+          cp /wg_monit "$MONIT_CONF_PATH"
+          sed -i "s|\${INTERFACE}|wg$i|g" "$MONIT_CONF_PATH"
+      fi
+  done
 fi
 
 sed -i 's/^#  include \/etc\/monit\.d\/\*$/  include \/etc\/monit.d\/*/' /etc/monitrc
 
 XRAY_CONFIG_URL="http://xray-config:5000/config"
 
-# Perform a GET request to the upstream
-RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" "$XRAY_CONFIG_URL")
+# Wait for Xray config
+MAX_RETRIES=30
+RETRY_COUNT=0
+while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+    RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" "$XRAY_CONFIG_URL")
+    if [ "$RESPONSE" -eq 200 ]; then
+        echo "xray-config is ready: $XRAY_CONFIG_URL"
+        break
+    fi
+    echo "Waiting for xray-config... (HTTP status: $RESPONSE)"
+    sleep 2
+    RETRY_COUNT=$((RETRY_COUNT + 1))
+done
 
-# Check the HTTP status code of xray-config upstream
-if [ "$RESPONSE" -eq 200 ]; then
-    echo "xray-config is ready: $XRAY_CONFIG_URL"
-else
-    echo "xray-config is not ready yet: $XRAY_CONFIG_URL (HTTP status: $RESPONSE)"
-    sleep 5
+if [ $RETRY_COUNT -eq $MAX_RETRIES ]; then
+    echo "Error: xray-config timed out"
     exit 1
 fi
 
-curl $XRAY_CONFIG_URL > /etc/xray/config.json
+# Fetch the final config and verify it
+if ! curl -sf "$XRAY_CONFIG_URL" > /etc/xray/config.json; then
+    echo "Error: Failed to fetch xray config from $XRAY_CONFIG_URL"
+    exit 1
+fi
 
-echo "#bin/sh" > /usr/sbin/resolvconf
+# Verify the config is valid JSON and functional
+if ! xray test -c /etc/xray/config.json > /dev/null 2>&1; then
+    echo "Error: Fetched xray config is invalid"
+    [ "$DEBUG" = "true" ] && cat /etc/xray/config.json
+    exit 1
+fi
 
-#echo -e "nameserver 127.0.0.1\nnameserver 127.0.0.11" > /etc/resolv.conf
+# Start Xray immediately so xray-config can test it
+/start_xray.sh
 
 monit --version
 
