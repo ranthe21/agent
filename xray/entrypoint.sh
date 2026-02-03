@@ -1,6 +1,6 @@
 #!/bin/sh
 
-rm /run/*.pid
+rm -f /run/*.pid
 
 # Mock resolvconf to prevent wg-quick from breaking Docker DNS
 # This keeps the container's /etc/resolv.conf (Docker DNS) intact.
@@ -102,9 +102,9 @@ if ! curl -sf "$XRAY_CONFIG_URL" > /etc/xray/config.json; then
 fi
 
 # Verify the config is valid JSON and functional
-if ! xray test -c /etc/xray/config.json > /dev/null 2>&1; then
+if ! xray -test -config /etc/xray/config.json; then
     echo "Error: Fetched xray config is invalid"
-    [ "$DEBUG" = "true" ] && cat /etc/xray/config.json
+    cat /etc/xray/config.json
     exit 1
 fi
 
