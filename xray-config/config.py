@@ -386,7 +386,7 @@ Table = off
 
 [Peer]
 PublicKey = {warp["pubkey"]}
-AllowedIPs = 0.0.0.0/0
+AllowedIPs = 0.0.0.0/0, ::/0
 Endpoint = engage.cloudflareclient.com:2408
 """
 
