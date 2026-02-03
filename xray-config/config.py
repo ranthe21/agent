@@ -8,10 +8,9 @@ import requests
 
 # Add root to sys.path to allow importing shared_lib
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-from shared_lib.system import get_identifier
 from shared_lib.network import get_public_ip
 from shared_lib.xray import register_warp, generate_vmess_link
-from shared_lib.config import load_env
+from shared_lib.config import load_env, get_identifier
 from shared_lib.logger import log
 from shared_lib.paths import (
     ACME_SH_PATH,
