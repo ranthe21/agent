@@ -26,8 +26,12 @@ app = Flask(__name__)
 def update_metrics(configs):
     global latest_metrics
 
-    instance_ip = instance_location_info["ip"]
-    instance_country = instance_location_info["country"]
+    if isinstance(instance_location_info, dict):
+        instance_ip = instance_location_info.get("ip", "Unknown")
+        instance_country = instance_location_info.get("country", "Unknown")
+    else:
+        instance_ip = str(instance_location_info) if instance_location_info else "Unknown"
+        instance_country = "Unknown"
 
     metrics = []
     total_count = len(configs.values())
