@@ -1,5 +1,4 @@
 import os
-import subprocess
 import signal
 import json
 import sys
@@ -10,6 +9,7 @@ from flask import Flask, render_template, request, redirect, url_for, flash
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from shared_lib.paths import ENV_FILE, INBOUNDS_JSON, BOOTSTRAP_SCRIPT, RESTART_SCRIPT
 from shared_lib.config import load_env, write_env
+from shared_lib.system import exec_command
 from shared_lib.logger import log
 
 app = Flask(__name__)
@@ -346,7 +346,7 @@ def index() -> Any:
                 try:
                     os.chmod(full_script_path, 0o755)
                     script_dir = os.path.dirname(full_script_path)
-                    subprocess.run([full_script_path], cwd=script_dir, check=False)
+                    exec_command([full_script_path], cwd=script_dir)
                     flash(f"Successfully initiated: {script_basename}", "info")
                     script_message = (
                         f"Successfully initiated <strong>{script_basename}</strong>."

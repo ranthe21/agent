@@ -1,7 +1,7 @@
 import os
 import subprocess
 import unicodedata
-from typing import List, Optional, Dict
+from typing import List, Optional, Dict, Mapping
 
 from shared_lib.logger import log
 
@@ -25,13 +25,26 @@ def get_machine_id() -> str:
 
 
 def exec_command(
-    cmd: List[str], cwd: Optional[str] = None, capture_output: bool = False
+    cmd: List[str],
+    cwd: Optional[str] = None,
+    capture_output: bool = False,
+    env: Optional[Mapping[str, str]] = None,
 ) -> subprocess.CompletedProcess:
     """Standardized subprocess execution wrapper."""
     log.debug("Executing command", hypothesisId="SYS", cmd=" ".join(cmd), cwd=cwd)
     try:
+        # Merge current env with provided env if exists
+        full_env = os.environ.copy()
+        if env:
+            full_env.update(env)
+
         result = subprocess.run(
-            cmd, cwd=cwd, capture_output=capture_output, text=True, check=False
+            cmd,
+            cwd=cwd,
+            capture_output=capture_output,
+            text=True,
+            check=False,
+            env=full_env,
         )
         if result.returncode != 0:
             log.debug(
