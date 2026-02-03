@@ -3,7 +3,12 @@
 rm /run/*.pid
 
 # Mock resolvconf to prevent wg-quick from breaking Docker DNS
-echo "#!/bin/sh" > /usr/sbin/resolvconf
+# This keeps the container's /etc/resolv.conf (Docker DNS) intact.
+cat <<EOF > /usr/sbin/resolvconf
+#!/bin/sh
+# No-op mock to prevent wg-quick DNS changes
+exit 0
+EOF
 chmod +x /usr/sbin/resolvconf
 
 if [ "$XRAY_OUTBOUND" = "warp" ]; then
