@@ -27,7 +27,13 @@ NGINX_LOG_LEVEL="warn"
 if [ "$DEBUG" = "true" ]; then
     NGINX_LOG_LEVEL="debug"
 fi
-sed -i "s|error_log /var/log/compassvpn/nginx_error.log warn;|error_log /var/log/compassvpn/nginx_error.log $NGINX_LOG_LEVEL;|g" "$NGINX_CONF_PATH"
+
+# Robust replacement for the global error_log directive
+if grep -q "^error_log /var/log/compassvpn/nginx_error.log" "$NGINX_CONF_PATH"; then
+    sed -i "s|^error_log /var/log/compassvpn/nginx_error.log.*|error_log /var/log/compassvpn/nginx_error.log $NGINX_LOG_LEVEL;|" "$NGINX_CONF_PATH"
+else
+    echo "Warning: error_log directive for nginx_error.log not found in $NGINX_CONF_PATH"
+fi
 
 sed -i "s|\${DIRECT_SUBDOMAIN}|$DIRECT_SUBDOMAIN|g" "$NGINX_CONF_PATH"
 
