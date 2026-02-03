@@ -11,6 +11,7 @@ DNS_PATH="/etc/resolv.conf"
 PROF_PATH="/etc/profile"
 SSH_PATH="/etc/ssh/sshd_config"
 FAIL2BAN_JAIL_DIR="fail2ban/jail.d"
+FAIL2BAN_DATA_DIR="fail2ban/data"
 FAIL2BAN_SSHD_CONF="$FAIL2BAN_JAIL_DIR/sshd.conf"
 COMPASSVPN_LOG_PATH="/var/log/compassvpn/"
 
@@ -251,8 +252,9 @@ setup_compassvpn_logs() {
     fi
 
     # Create fail2ban data directory
-    mkdir -p fail2ban/data
-    chmod 750 fail2ban/data
+    mkdir -p "$FAIL2BAN_DATA_DIR"
+    chmod 750 "$FAIL2BAN_DATA_DIR"
+    chown root:root "$FAIL2BAN_DATA_DIR"
 
     # Set appropriate permissions (Prevent world-read/write)
     chmod 750 "$COMPASSVPN_LOG_PATH"
