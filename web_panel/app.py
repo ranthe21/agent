@@ -3,8 +3,8 @@ import subprocess
 import signal
 import json
 import sys
-from typing import Dict, List, Any, Union
-from flask import Flask, render_template, request, redirect, url_for, flash, Response
+from typing import Dict, List, Any
+from flask import Flask, render_template, request, redirect, url_for, flash
 
 # Add root to sys.path to allow importing shared_lib
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
@@ -269,7 +269,7 @@ UI_GROUPS: Dict[str, List[str]] = {
 
 
 @app.route("/", methods=["GET", "POST"])
-def index() -> Union[str, Response]:
+def index() -> Any:
     current_config = load_env(str(ENV_FILE))
 
     config_data = {}
@@ -338,7 +338,6 @@ def index() -> Union[str, Response]:
             identifier_value = newly_saved_config.get("IDENTIFIER", "").strip()
 
             script_to_run = RESTART_SCRIPT if identifier_value else BOOTSTRAP_SCRIPT
-            script_message = f"{'Restarting services' if identifier_value else 'Running initial bootstrap'} using {os.path.basename(script_to_run)}..."
 
             full_script_path = str(script_to_run)
             script_basename = os.path.basename(full_script_path)
