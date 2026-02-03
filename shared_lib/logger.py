@@ -21,6 +21,7 @@ def _is_debug_enabled():
                     if line.strip().startswith("DEBUG="):
                         return line.split("=", 1)[1].strip().lower() == "true"
         except Exception:
+            # Intentionally ignore errors while reading ENV_FILE and fall back to DEBUG disabled.
             pass
     return False
 
