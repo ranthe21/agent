@@ -392,11 +392,4 @@ def index() -> Any:
 
 
 if __name__ == "__main__":
-    os.makedirs("web_panel/templates", exist_ok=True)
-    os.makedirs("web_panel/static", exist_ok=True)
-    if not os.path.exists("web_panel/templates/index.html"):
-        with open("web_panel/templates/index.html", "w") as f:
-            f.write(
-                "<html><head><title>Config Panel</title></head><body><h1>Loading...</h1></body></html>"
-            )
     app.run(host="0.0.0.0", port=5050, debug=False)

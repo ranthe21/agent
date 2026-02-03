@@ -38,7 +38,4 @@ COPY config.py config.py
 COPY run.py run.py
 COPY inbounds.json inbounds.json
 
-# Create an empty utils.py to satisfy any legacy imports if they exist
-RUN touch utils.py
-
 CMD ["python3", "run.py"]

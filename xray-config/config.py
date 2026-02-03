@@ -3,6 +3,7 @@ import os
 import string
 import sys
 from time import sleep
+from typing import Any, Dict, List, Optional
 import requests
 
 # Add root to sys.path to allow importing shared_lib
@@ -21,31 +22,31 @@ from shared_lib.paths import (
 
 
 class XrayConfig:
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize instance attributes to hold shared variables."""
-        self.env_config = {}
-        self.is_debug_enabled = False
-        self.config_id = ""
-        self.config_uuid = ""
-        self.cf_api_token = None
-        self.cf_zone_id = None
-        self.nginx_path = None
-        self.xray_inbounds = []
-        self.server_ip = "Unknown"
-        self.domain = None
-        self.subdomain = None
-        self.direct_subdomain = None
-        self.cert_public = ""
-        self.cert_private = ""
-        self.cf_clean_ip_domain = "npmjs.com"
-        self.configured_inbounds = []
-        self.xray_config = {}
-        self.warps_ready = False
-        self.wg_configs = {}
-        self.warps = []
-        self.initialized = False
+        self.env_config: Dict[str, str] = {}
+        self.is_debug_enabled: bool = False
+        self.config_id: str = ""
+        self.config_uuid: str = ""
+        self.cf_api_token: Optional[str] = None
+        self.cf_zone_id: Optional[str] = None
+        self.nginx_path: Optional[str] = None
+        self.xray_inbounds: List[str] = []
+        self.server_ip: str = "Unknown"
+        self.domain: Optional[str] = None
+        self.subdomain: Optional[str] = None
+        self.direct_subdomain: Optional[str] = None
+        self.cert_public: str = ""
+        self.cert_private: str = ""
+        self.cf_clean_ip_domain: str = "npmjs.com"
+        self.configured_inbounds: List[Dict[str, Any]] = []
+        self.xray_config: Dict[str, Any] = {}
+        self.warps_ready: bool = False
+        self.wg_configs: Dict[str, str] = {}
+        self.warps: List[Dict[str, Any]] = []
+        self.initialized: bool = False
 
-    def _get_domain(self):
+    def _get_domain(self) -> None:
         """Internal method to retrieve domain from Cloudflare API."""
         url = f"https://api.cloudflare.com/client/v4/zones/{self.cf_zone_id}"
         headers = {
@@ -56,7 +57,7 @@ class XrayConfig:
             response = requests.get(url, headers=headers)
             log.debug(
                 "get_domain response",
-                hypothesisId="C",
+                hypothesisId="DNS",
                 status=response.status_code,
                 body=response.text[:200],
             )
@@ -64,21 +65,21 @@ class XrayConfig:
                 self.domain = response.json()["result"]["name"]
                 log.info(
                     f"The domain name associated with zone ID {self.cf_zone_id} is: {self.domain}",
-                    hypothesisId="C",
+                    hypothesisId="DNS",
                 )
             else:
                 log.error(
                     f"Failed to retrieve domain name. Status code: {response.status_code}",
-                    hypothesisId="C",
+                    hypothesisId="DNS",
                 )
         except Exception as e:
-            log.debug("get_domain error", hypothesisId="C", error=str(e))
+            log.debug("get_domain error", hypothesisId="DNS", error=str(e))
 
-    def _create_cf_records(self):
+    def _create_cf_records(self) -> Optional[str]:
         """Internal method to manage Cloudflare DNS records."""
-        log.debug("Starting create_cf_records", hypothesisId="D")
+        log.debug("Starting create_cf_records", hypothesisId="DNS")
 
-        def dns_record_already_exist(record_name):
+        def dns_record_already_exist(record_name: str) -> Optional[bool]:
             url = f"https://api.cloudflare.com/client/v4/zones/{self.cf_zone_id}/dns_records?type=A&name={record_name}.{self.domain}"
             headers = {
                 "Authorization": f"Bearer {self.cf_api_token}",
@@ -88,7 +89,7 @@ class XrayConfig:
                 response = requests.get(url, headers=headers)
                 log.debug(
                     f"Check DNS {record_name}",
-                    hypothesisId="D",
+                    hypothesisId="DNS",
                     status=response.status_code,
                 )
                 if response.status_code == 200:
@@ -96,11 +97,11 @@ class XrayConfig:
                     return bool(dns_records)
             except Exception as e:
                 log.debug(
-                    f"Check DNS error {record_name}", hypothesisId="D", error=str(e)
+                    f"Check DNS error {record_name}", hypothesisId="DNS", error=str(e)
                 )
             return None
 
-        def create_dns_record(name, proxied):
+        def create_dns_record(name: str, proxied: bool) -> Optional[str]:
             endpoint = f"https://api.cloudflare.com/client/v4/zones/{self.cf_zone_id}/dns_records"
             if dns_record_already_exist(name):
                 return name
@@ -122,12 +123,12 @@ class XrayConfig:
                     name=name,
                     status=response.status_code,
                     body=response.text[:200],
-                    hypothesisId="D",
+                    hypothesisId="DNS",
                 )
                 if response.status_code == 200:
                     return name
             except Exception as e:
-                log.debug(f"Create DNS error {name}", hypothesisId="D", error=str(e))
+                log.debug(f"Create DNS error {name}", hypothesisId="DNS", error=str(e))
             return None
 
         server_ip_str = str(self.server_ip)
@@ -136,7 +137,7 @@ class XrayConfig:
         res2 = create_dns_record(name, True)
         return name if res1 and res2 else None
 
-    def initialize(self):
+    def initialize(self) -> None:
         """Perform all initialization logic. Only executes once."""
         if self.initialized:
             return
@@ -144,11 +145,11 @@ class XrayConfig:
         self.env_config = load_env()
         self.is_debug_enabled = self.env_config.get("DEBUG", "false").lower() == "true"
         log.debug(
-            "Loaded env_config", hypothesisId="A", keys=list(self.env_config.keys())
+            "Loaded env_config", hypothesisId="CFG", keys=list(self.env_config.keys())
         )
 
         self.config_id = get_identifier()
-        log.debug("Identifier", hypothesisId="A", id=self.config_id)
+        log.debug("Identifier", hypothesisId="CFG", id=self.config_id)
 
         uuid_res = exec_command(
             ["xray", "uuid", "-i", self.config_id], capture_output=True
@@ -165,12 +166,12 @@ class XrayConfig:
 
         log.debug(
             "CF Config",
-            hypothesisId="A",
+            hypothesisId="CFG",
             has_token=bool(self.cf_api_token),
             has_zone=bool(self.cf_zone_id),
         )
 
-        self.server_ip = self.env_config.get("SERVER_IP")
+        self.server_ip = self.env_config.get("SERVER_IP", "")
         if not self.server_ip:
             server_ip_raw = get_public_ip()
             if isinstance(server_ip_raw, dict):
@@ -178,7 +179,7 @@ class XrayConfig:
             else:
                 self.server_ip = str(server_ip_raw) if server_ip_raw else "Unknown"
 
-        log.debug("Server IP", hypothesisId="B", ip=self.server_ip)
+        log.debug("Server IP", hypothesisId="NET", ip=self.server_ip)
 
         # DNS and ACME Logic
         if self.cf_api_token and self.cf_zone_id and self.server_ip != "Unknown":
@@ -190,7 +191,7 @@ class XrayConfig:
                     self.direct_subdomain = f"{a_record}-direct.{self.domain}"
                     log.debug(
                         "Subdomains set",
-                        hypothesisId="E",
+                        hypothesisId="DNS",
                         sub=self.subdomain,
                         direct=self.direct_subdomain,
                     )
@@ -204,7 +205,7 @@ class XrayConfig:
 
                     acme_bin = f"{ACME_SH_PATH}/acme.sh"
 
-                    def run_acme(cmd_args):
+                    def run_acme(cmd_args: str) -> bool:
                         import shlex
 
                         cmd_list = [acme_bin] + shlex.split(cmd_args)
@@ -225,12 +226,12 @@ class XrayConfig:
                         ACME_SH_PATH / f"{self.direct_subdomain}_ecc" / "fullchain.cer"
                     )
                     if cert_path.exists():
-                        log.debug("Cert exists, renewing", hypothesisId="F")
+                        log.debug("Cert exists, renewing", hypothesisId="CERT")
                         run_acme(
                             f"{ssl_provider_server} --renew --dns dns_cf -d {self.direct_subdomain}"
                         )
                     else:
-                        log.debug("Cert missing, issuing", hypothesisId="F")
+                        log.debug("Cert missing, issuing", hypothesisId="CERT")
                         if run_acme("--register-account -m my@example.com"):
                             run_acme(
                                 f"{ssl_provider_server} --issue --dns dns_cf -d {self.direct_subdomain}"
@@ -248,15 +249,15 @@ class XrayConfig:
                         ) as file:
                             self.cert_private = file.read()
                             self.cert_private = json.dumps(self.cert_private)[1:-1]
-                        log.debug("Certs loaded successfully", hypothesisId="F")
+                        log.debug("Certs loaded successfully", hypothesisId="CERT")
                     except Exception as e:
-                        log.debug("Cert load error", hypothesisId="F", error=str(e))
+                        log.debug("Cert load error", hypothesisId="CERT", error=str(e))
             else:
-                log.debug("Domain not found, skipping records", hypothesisId="C")
+                log.debug("Domain not found, skipping records", hypothesisId="DNS")
         else:
             log.debug(
                 "CF tokens missing or IP unknown, skipping DNS/SSL setup",
-                hypothesisId="A",
+                hypothesisId="CFG",
             )
 
         self.cf_clean_ip_domain = self.env_config.get("CF_CLEAN_IP_DOMAIN", "npmjs.com")
@@ -472,9 +473,9 @@ Endpoint = engage.cloudflareclient.com:2408
 
         self.initialized = True
 
-    def get_config_links(self):
+    def get_config_links(self) -> List[str]:
         """Return formatted config links for active inbounds."""
-        configs = []
+        configs: List[str] = []
         if self.subdomain:
             configs.extend(
                 [

@@ -1,8 +1,8 @@
 import json
 import os
 import threading
-import time
 import sys
+from typing import Dict, List, Optional, Union
 from flask import Flask, abort
 
 # Add root to sys.path
@@ -16,14 +16,15 @@ from shared_lib.paths import CONFIGS_CSV, VALID_CSV, ACME_SH_PATH
 
 
 class XrayService:
-    def __init__(self):
-        self.app = Flask(__name__)
-        self.valid_configs = {}
-        self.latest_metrics = ""
-        self.instance_location_info = None
+    def __init__(self) -> None:
+        self.app: Flask = Flask(__name__)
+        self.valid_configs: Dict[str, List[str]] = {}
+        self.latest_metrics: str = ""
+        self.instance_location_info: Optional[Union[str, Dict[str, str]]] = None
+        self._shutdown_event: threading.Event = threading.Event()
         self._setup_routes()
 
-    def _setup_routes(self):
+    def _setup_routes(self) -> None:
         @self.app.route("/config")
         def get_xray_config():
             return json.dumps(config.xray_config, indent=4)
@@ -54,7 +55,7 @@ class XrayService:
         def metrics():
             return self.latest_metrics
 
-    def update_metrics(self, configs):
+    def update_metrics(self, configs: Dict[str, List[str]]) -> bool:
         if not self.instance_location_info:
             self.instance_location_info = get_public_ip(extra=True)
 
@@ -114,18 +115,24 @@ class XrayService:
             return False
         return True
 
-    def background_job(self):
-        log.info("start bg job", hypothesisId="BG")
+    def _interruptible_sleep(self, seconds: int) -> bool:
+        """Sleep for `seconds`, returns True if shutdown requested."""
+        return self._shutdown_event.wait(timeout=seconds)
 
-        while True:
+    def background_job(self) -> None:
+        log.info("start bg job", hypothesisId="TEST")
+
+        while not self._shutdown_event.is_set():
             if not config.initialized:
-                time.sleep(5)
+                if self._interruptible_sleep(5):
+                    break
                 continue
 
             config_links = config.get_config_links()
             if not config_links:
-                log.info("No config links found, waiting...", hypothesisId="BG")
-                time.sleep(60)
+                log.info("No config links found, waiting...", hypothesisId="TEST")
+                if self._interruptible_sleep(60):
+                    break
                 continue
 
             valid_links = [
@@ -136,9 +143,10 @@ class XrayService:
 
             if not valid_links:
                 log.info(
-                    "No valid vmess/vless links found, waiting...", hypothesisId="BG"
+                    "No valid vmess/vless links found, waiting...", hypothesisId="TEST"
                 )
-                time.sleep(60)
+                if self._interruptible_sleep(60):
+                    break
                 continue
 
             with open(CONFIGS_CSV, "w") as configs_csv:
@@ -146,7 +154,7 @@ class XrayService:
 
             exec_command(["cat", str(CONFIGS_CSV)])
 
-            log.info("start xray testing...", hypothesisId="BG")
+            log.info("start xray testing...", hypothesisId="TEST")
             exec_command(
                 [
                     "xray-knife",
@@ -181,21 +189,23 @@ class XrayService:
                 success = self.update_metrics(self.valid_configs)
             else:
                 log.info(
-                    "No valid configurations found after testing.", hypothesisId="BG"
+                    "No valid configurations found after testing.", hypothesisId="TEST"
                 )
                 success = False
 
-            log.info(f"xray test done - success: {success}", hypothesisId="BG")
+            log.info(f"xray test done - success: {success}", hypothesisId="TEST")
 
-            if success:
-                time.sleep(300)
-            else:
-                time.sleep(15)
+            sleep_duration = 300 if success else 15
+            if self._interruptible_sleep(sleep_duration):
+                break
 
-    def cert_management_job(self):
-        while True:
+        log.info("Background job shutting down", hypothesisId="TEST")
+
+    def cert_management_job(self) -> None:
+        while not self._shutdown_event.is_set():
             if not config.initialized:
-                time.sleep(5)
+                if self._shutdown_event.wait(timeout=5):
+                    break
                 continue
 
             if config.cf_api_token and config.direct_subdomain:
@@ -210,11 +220,15 @@ class XrayService:
                     ],
                     env={"CF_Token": config.cf_api_token or ""},
                 )
-                time.sleep(86400 * 30)
+                # 30-day sleep, interruptible
+                if self._shutdown_event.wait(timeout=86400 * 30):
+                    break
             else:
-                time.sleep(60)
+                if self._shutdown_event.wait(timeout=60):
+                    break
+        log.info("Cert management job shutting down", hypothesisId="CERT")
 
-    def run(self):
+    def run(self) -> None:
         config.initialize()
 
         thread = threading.Thread(target=self.background_job)
