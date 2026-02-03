@@ -4,6 +4,7 @@ import os
 from typing import List
 from shared_lib.paths import DEBUG_LOG, ENV_FILE
 
+
 def _is_debug_enabled():
     """Check if debug is enabled in environment or env_file without circular imports."""
     # 1. Check environment
@@ -37,7 +38,7 @@ try:
     log_dir = os.path.dirname(str(DEBUG_LOG))
     if log_dir and not os.path.exists(log_dir):
         os.makedirs(log_dir, exist_ok=True)
-    
+
     # We always attempt to add the file handler if we're in debug mode
     # or if the file already exists.
     if _is_debug_enabled() or os.path.isfile(str(DEBUG_LOG)):
