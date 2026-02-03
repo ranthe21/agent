@@ -216,7 +216,7 @@ CONFIG_SCHEMA: List[Dict[str, Any]] = [
     {
         "name": "NGINX_FAKE_WEBSITE",
         "type": "text",
-        "default": "www.google.com",
+        "default": "www.divar.ir",
         "placeholder": "e.g., www.bing.com",
         "comment": 'Website to proxy for obfuscation (must NOT be behind major CDN). <a href="https://www.compassvpn.org/installation/configuration/#nginx_fake_website" target="_blank" rel="noopener noreferrer">Read More.</a>',
     },
