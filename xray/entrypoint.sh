@@ -36,7 +36,11 @@ if [ "$XRAY_OUTBOUND" = "warp" ]; then
 
   # Fetch WireGuard configs and save them locally
   mkdir -p /etc/wireguard
-  WG_CONFIGS=$(curl -s "$WG_CONFIGS_URL")
+  if ! WG_CONFIGS=$(curl -sf "$WG_CONFIGS_URL"); then
+      echo "Error: Failed to fetch WireGuard configs"
+      exit 1
+  fi
+
   if [ "$DEBUG" = "true" ]; then
       echo "$WG_CONFIGS"
   fi
@@ -91,7 +95,18 @@ if [ $RETRY_COUNT -eq $MAX_RETRIES ]; then
     exit 1
 fi
 
-curl -s "$XRAY_CONFIG_URL" > /etc/xray/config.json
+# Fetch the final config and verify it
+if ! curl -sf "$XRAY_CONFIG_URL" > /etc/xray/config.json; then
+    echo "Error: Failed to fetch xray config from $XRAY_CONFIG_URL"
+    exit 1
+fi
+
+# Verify the config is valid JSON and functional
+if ! xray test -c /etc/xray/config.json > /dev/null 2>&1; then
+    echo "Error: Fetched xray config is invalid"
+    [ "$DEBUG" = "true" ] && cat /etc/xray/config.json
+    exit 1
+fi
 
 # Start Xray immediately so xray-config can test it
 /start_xray.sh
