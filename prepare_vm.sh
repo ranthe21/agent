@@ -289,14 +289,9 @@ setup_logrotate_for_compassvpn() {
 
     local lr_file="/etc/logrotate.d/compassvpn"
     cat > "$lr_file" <<'EOF'
-/var/log/compassvpn/xray_access.log
-/var/log/compassvpn/xray_error.log
-/var/log/compassvpn/nginx_access.log
-/var/log/compassvpn/nginx_error.log
-/var/log/compassvpn/debug.log
-/var/log/compassvpn/xray.log {
+/var/log/compassvpn/*.log {
     size 500M
-    rotate 8
+    rotate 2
     compress
     delaycompress
     missingok
