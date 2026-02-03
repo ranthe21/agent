@@ -32,11 +32,11 @@ services:
       - env_file
     environment:
       - TZ=UTC
-      - PYTHONPATH=/root
+      - PYTHONPATH=/
     volumes:
       - "/etc/machine-id:/host/etc/machine-id"
       - "acme:/root/.acme.sh/"
-      - "./shared_lib:/root/shared_lib:ro"
+      - "./shared_lib:/shared_lib:ro"
       - "./env_file:/root/env_file:ro"
       - "/var/log/compassvpn:/var/log/compassvpn:rw"
 
@@ -56,7 +56,7 @@ services:
       - env_file
     environment:
       - TZ=UTC
-      - PYTHONPATH=/:/shared_lib
+      - PYTHONPATH=/
     depends_on:
       - xray-config
     ports:
@@ -87,7 +87,7 @@ services:
       - "8443:8443/udp"
     environment:
       - TZ=UTC
-      - PYTHONPATH=/:/shared_lib
+      - PYTHONPATH=/
     depends_on:
       - xray
 
@@ -106,7 +106,7 @@ services:
       - "9550:9550"
     environment:
       - LOG_LEVEL=info
-      - PYTHONPATH=/:/shared_lib
+      - PYTHONPATH=/
 
   metric-forwarder:
     build:
@@ -118,7 +118,7 @@ services:
       - env_file
     environment:
       - TZ=UTC
-      - PYTHONPATH=/:/shared_lib
+      - PYTHONPATH=/
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:
