@@ -11,7 +11,11 @@ from shared_lib.config import load_env
 env_config = load_env()
 
 instance_location_info = get_public_ip(extra=True)
-instance_ip = instance_location_info["ip"]
+instance_ip = (
+    instance_location_info.get("ip", "Unknown")
+    if isinstance(instance_location_info, dict)
+    else "Unknown"
+)
 
 # Use env_config as the single source of truth
 DONOR = env_config.get("DONOR", "compass")
