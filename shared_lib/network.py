@@ -48,4 +48,6 @@ def get_public_ip(extra: bool = False) -> Union[str, Dict[str, str]]:
             continue
 
     log.debug("All IP providers failed", hypothesisId="NET")
-    raise RuntimeError("Failed to fetch public IP from all available providers.")
+    if extra:
+        return {"ip": "Unknown", "country": "Unknown"}
+    return "Unknown"
