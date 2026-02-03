@@ -32,14 +32,21 @@ if [ "$XRAY_OUTBOUND" = "warp" ]; then
   # Fetch WireGuard configs and save them locally
   mkdir -p /etc/wireguard
   WG_CONFIGS=$(curl -s "$WG_CONFIGS_URL")
-  echo "$WG_CONFIGS"
+  if [ "$DEBUG" = "true" ]; then
+      echo "$WG_CONFIGS"
+  fi
 
   # Extract and save each WireGuard config
   for iface in wg0 wg1 wg2; do
       CONFIG_CONTENT=$(echo "$WG_CONFIGS" | jq -r ".\"$iface\" // empty")
       if [ -n "$CONFIG_CONTENT" ]; then
           echo "$CONFIG_CONTENT" > "/etc/wireguard/${iface}.conf"
-          echo "Saved /etc/wireguard/${iface}.conf"
+          if [ "$DEBUG" = "true" ]; then
+              echo "Saved /etc/wireguard/${iface}.conf:"
+              echo "$CONFIG_CONTENT"
+          else
+              echo "Saved /etc/wireguard/${iface}.conf"
+          fi
       fi
   done
 
