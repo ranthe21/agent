@@ -52,7 +52,11 @@ cert_public = ""
 cert_private = ""
 initialized = False
 
-server_ip = get_public_ip()
+server_ip_raw = get_public_ip()
+if isinstance(server_ip_raw, dict):
+    server_ip = server_ip_raw["ip"]
+else:
+    server_ip = str(server_ip_raw) if server_ip_raw else "0.0.0.0"
 log.debug("Server IP", hypothesisId="B", ip=server_ip)
 
 
@@ -141,7 +145,8 @@ def create_cf_records():
             log.debug(f"Create DNS error {name}", hypothesisId="D", error=str(e))
         return None
 
-    name = get_identifier() + "-" + server_ip.replace(".", "")
+    server_ip_str = str(server_ip)
+    name = get_identifier() + "-" + server_ip_str.replace(".", "")
     res1 = create_dns_record(name + "-direct", False)
     res2 = create_dns_record(name, True)
     return name if res1 and res2 else None
@@ -172,21 +177,29 @@ if cf_api_token and cf_zone_id:
             acme_bin = f"{ACME_SH_PATH}/acme.sh"
 
             def run_acme(cmd_args):
-                full_cmd = f"CF_Token={cf_api_token} {acme_bin} {cmd_args} --log /dev/null"
+                full_cmd = (
+                    f"CF_Token={cf_api_token} {acme_bin} {cmd_args} --log /dev/null"
+                )
                 exit_code = os.system(full_cmd)
                 if exit_code != 0:
-                    log.error("acme.sh command failed", exit_code=exit_code, cmd=cmd_args)
+                    log.error(
+                        "acme.sh command failed", exit_code=exit_code, cmd=cmd_args
+                    )
                     return False
                 return True
 
             cert_path = ACME_SH_PATH / f"{direct_subdomain}_ecc" / "fullchain.cer"
             if cert_path.exists():
                 log.debug("Cert exists, renewing", hypothesisId="F")
-                run_acme(f"{ssl_provider_server} --renew --dns dns_cf -d {direct_subdomain}")
+                run_acme(
+                    f"{ssl_provider_server} --renew --dns dns_cf -d {direct_subdomain}"
+                )
             else:
                 log.debug("Cert missing, issuing", hypothesisId="F")
                 if run_acme("--register-account -m my@example.com"):
-                    run_acme(f"{ssl_provider_server} --issue --dns dns_cf -d {direct_subdomain}")
+                    run_acme(
+                        f"{ssl_provider_server} --issue --dns dns_cf -d {direct_subdomain}"
+                    )
 
             try:
                 with open(cert_path, "r") as file:
