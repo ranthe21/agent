@@ -376,10 +376,10 @@ if env_config.get("XRAY_OUTBOUND") == "warp":
 
     # Generate WireGuard config content for each interface
     for i, warp in enumerate(warps):
-        addr = warp["addresses"][0] if warp["addresses"] else ""
+        addresses = ", ".join(warp["addresses"]) if warp.get("addresses") else ""
         wg_configs[f"wg{i}"] = f"""[Interface]
 PrivateKey = {warp["privatekey"]}
-Address = {addr}
+Address = {addresses}
 DNS = 1.1.1.1
 MTU = 1280
 Table = off
