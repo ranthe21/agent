@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Configuration variables
-DNS_SERVERS=("1.1.1.2" "1.0.0.2" "127.0.0.53")
+DNS_SERVERS=("1.1.1.2" "127.0.0.53")
 REQUIRED_PORTS=("80" "8080" "443" "2053" "8443" "9100")
 SYSCTL_CONF_PATH="/etc/sysctl.d/99-compassvpn.conf"
 
@@ -252,27 +252,27 @@ setup_compassvpn_logs() {
 
     # Create fail2ban data directory
     mkdir -p fail2ban/data
-    chmod 755 fail2ban/data
+    chmod 750 fail2ban/data
 
-    # Set appropriate permissions (Allow Docker volumes, but prevent world-write)
-    chmod 755 "$COMPASSVPN_LOG_PATH"
+    # Set appropriate permissions (Prevent world-read/write)
+    chmod 750 "$COMPASSVPN_LOG_PATH"
 
     # Set ownership to root:root (standard for system logs)
     chown root:root "$COMPASSVPN_LOG_PATH"
 
-    # Create log files and set permissions to 644 (Read for all, Write for owner)
+    # Create log files and set permissions to 640 (Read only for owner/group)
     echo "Creating log files..."
     local logs=("nginx_access.log" "nginx_error.log" "xray_access.log" "xray_error.log" "xray.log" "debug.log")
     for log in "${logs[@]}"; do
         touch "$COMPASSVPN_LOG_PATH/$log"
-        chmod 644 "$COMPASSVPN_LOG_PATH/$log"
+        chmod 640 "$COMPASSVPN_LOG_PATH/$log"
     done
 
     # Setup standard Nginx error log path
     echo "Setting up Nginx error log..."
     mkdir -p /var/log/nginx
     touch /var/log/nginx/error.log
-    chmod 644 /var/log/nginx/error.log
+    chmod 640 /var/log/nginx/error.log
 
     echo "Log setup completed."
 }
