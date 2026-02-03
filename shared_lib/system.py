@@ -52,23 +52,6 @@ def exec_command(
         raise e
 
 
-def get_identifier() -> str:
-    """Retrieves the system identifier from environment variables or config file."""
-    identifier = os.environ.get("IDENTIFIER")
-    if not identifier:
-        # Check if we can load it from env_file if not in environment
-        from .config import load_env
-
-        env_config = load_env()
-        identifier = env_config.get("IDENTIFIER")
-
-    if not identifier:
-        raise RuntimeError(
-            "Critical system error: 'IDENTIFIER' not found in environment or configuration file."
-        )
-    return identifier.lower()
-
-
 def csv_to_dict(filename: str) -> Dict[str, List[str]]:
     """Converts a CSV file to a dictionary, skipping headers and malformed lines."""
     data = {}
