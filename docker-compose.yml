@@ -46,7 +46,7 @@ services:
       dockerfile: Dockerfile
     <<: *high-perf
     volumes:
-      - "/var/log:/var/log"
+      - "/var/log/compassvpn:/var/log/compassvpn:rw"
       - "./shared_lib:/shared_lib:ro"
       - "./env_file:/env_file:ro"
     cap_add:
@@ -72,7 +72,8 @@ services:
     <<: *high-perf
     volumes:
       - "acme:/root/.acme.sh/"
-      - "/var/log:/var/log"
+      - "/var/log/compassvpn:/var/log/compassvpn:rw"
+      - "/var/log/nginx:/var/log/nginx:rw"
       - "./shared_lib:/shared_lib:ro"
     restart: always
     env_file:
