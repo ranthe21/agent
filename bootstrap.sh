@@ -13,20 +13,18 @@ command_not_exists() {
 # Check if running as root
 check_root() {
     if [ "$EUID" -ne 0 ]; then
-        echo "This script must be run as root."
+        echo "Error: This script must be run as root."
         exit 1
     fi
-    echo "Running as root: OK"
 }
 
 # Check environment file
 check_env_file() {
     local file_path="env_file"
     if [ -f $file_path ]; then
-        echo "'$file_path' exists."
         source $file_path
     else
-        echo "'$file_path' file does not exist. use env_file.example as template"
+        echo "Error: '$file_path' file does not exist."
         exit 1
     fi
 }
@@ -78,32 +76,41 @@ deploy() {
 
 # Main function to execute all steps
 main() {
-    echo
     echo "Starting bootstrap process..."
     echo
 
-    check_root
-    sleep 0.5
+    declare -A STEP_NAMES
+    STEP_NAMES=(
+        [check_root]="Checking root privileges"
+        [check_env_file]="Checking environment file"
+        [prepare_vm]="Preparing the VM"
+        [install_docker]="Installing Docker"
+        [add_identifier]="Generating unique identifier"
+        [setup_cron]="Setting up cron jobs"
+        [deploy]="Deploying with Docker Compose"
+    )
 
-    check_env_file
-    sleep 0.5
+    local steps=(
+        check_root
+        check_env_file
+        prepare_vm
+        install_docker
+        add_identifier
+        setup_cron
+        deploy
+    )
 
-    prepare_vm
-    sleep 0.5
-
-    install_docker
-    sleep 0.5
-
-    add_identifier
-    sleep 0.5
-
-    setup_cron
-    sleep 0.5
-
-    deploy
-    sleep 0.5
+    for step in "${steps[@]}"; do
+        echo "Step: ${STEP_NAMES[$step]}"
+        if ! $step; then
+            echo "Error: ${STEP_NAMES[$step]} failed."
+            echo
+            exit 1
+        fi
+        echo
+        sleep 0.5
+    done
     
-    echo
     echo "Bootstrap completed successfully."
     echo
     echo "Please allow 5~10 minutes for the metrics to appear in your Grafana dashboard."

@@ -1,18 +1,13 @@
 #!/bin/bash
 
-set -e 
-
-# Trap errors
-trap 'echo "An error occurred. Exiting..."; exit 1' ERR
-
 # Configuration variables
 DNS_SERVERS=("1.1.1.2" "1.0.0.2" "127.0.0.53")
 REQUIRED_PORTS=("80" "8080" "443" "2053" "8443" "9100")
+SYSCTL_CONF_PATH="/etc/sysctl.d/99-compassvpn.conf"
 
 # Paths
 HOST_PATH="/etc/hosts"
 DNS_PATH="/etc/resolv.conf"
-SYS_PATH="/etc/sysctl.conf"
 PROF_PATH="/etc/profile"
 SSH_PATH="/etc/ssh/sshd_config"
 FAIL2BAN_JAIL_DIR="fail2ban/jail.d"
@@ -52,11 +47,7 @@ check_system() {
 check_openvz() {
     if [ -f /proc/user_beancounters ]; then
         IS_OPENVZ=1
-        echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
-        echo "WARNING: OPENVZ DETECTED. THIS VIRTUALIZATION HAS KNOWN LIMITATIONS."
-        echo "COMPASSVPN MAY NOT FUNCTION CORRECTLY."
-        echo "IT IS RECOMMENDED TO USE OTHER DATACENTERS."
-        echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+        echo "Warning: OpenVZ detected. This virtualization has known limitations."
         sleep 3
     fi
 }
@@ -69,6 +60,7 @@ fix_etc_hosts() {
     fi
 
     cp "$HOST_PATH" /etc/hosts.bak
+    chmod 644 /etc/hosts.bak
     if [ $? -ne 0 ]; then
         echo "Error: Failed to backup hosts file."
         return 1
@@ -88,6 +80,7 @@ fix_dns() {
     fi
 
     cp "$DNS_PATH" /etc/resolv.conf.bak
+    chmod 644 /etc/resolv.conf.bak
     if [ $? -ne 0 ]; then
         echo "Error: Failed to backup resolv.conf file."
         return 1
@@ -138,35 +131,13 @@ sysctl_optimizations() {
         return 0
     fi
 
-    if [ ! -f "$SYS_PATH" ]; then
-        echo "Error: sysctl.conf file not found at $SYS_PATH."
-        return 1
-    fi
-
-    cp "$SYS_PATH" /etc/sysctl.conf.bak
-    if [ $? -ne 0 ]; then
-        echo "Error: Failed to backup sysctl.conf."
-        return 1
-    fi
-
     echo "Optimizing network settings..."
-    
-    # Remove existing settings
-    sed -i -e '/fs.file-max/d' \
-        -e '/net.core.default_qdisc/d' \
-        -e '/net.core.optmem_max/d' \
-        -e '/net.core.rmem_max/d' \
-        -e '/net.core.wmem_max/d' \
-        -e '/net.ipv4.tcp_congestion_control/d' \
-        -e '/net.ipv4.tcp_max_syn_backlog/d' \
-        -e '/net.ipv4.tcp_fin_timeout/d' \
-        -e '/net.core.netdev_max_backlog/d' \
-        -e '/^#/d' \
-        -e '/^$/d' \
-        "$SYS_PATH"
 
-    # Add new settings
-    cat <<EOF >> "$SYS_PATH"
+    # Create sysctl.d directory if it doesn't exist
+    mkdir -p /etc/sysctl.d
+
+    # Add new settings to a dedicated file
+    cat <<EOF > "$SYSCTL_CONF_PATH"
 fs.file-max = 67108864
 net.core.default_qdisc = fq
 net.core.optmem_max = 262144
@@ -179,7 +150,7 @@ net.core.netdev_max_backlog = 32768
 EOF
 
     # Apply settings
-    sudo sysctl -p >/dev/null 2>&1
+    sudo sysctl --system >/dev/null 2>&1
     echo "Network settings optimized."
 }
 
@@ -201,7 +172,7 @@ install_ufw() {
         apt-get install -qqy ufw
         
         if ! command_exists ufw; then
-            echo "Failed to install UFW."
+            echo "Error: Failed to install UFW."
             exit 1
         fi
     fi
@@ -209,43 +180,35 @@ install_ufw() {
 
 # Find SSH port and store it in SSH_PORT variable
 find_ssh_port() {
-    # Default to port 22
-    SSH_PORT=22
+    # 1. Try active detection first (what is actually listening)
+    SSH_PORT=$(ss -tlnp | grep -oP '(?<=:)\d+(?=.*sshd)' | head -n1 || echo "")
     
-    if [ -e "$SSH_PATH" ]; then
-        PORT_LINE=$(grep -oP '^Port\s+\K\d+' "$SSH_PATH" 2>/dev/null || echo "")
+    if [ -n "$SSH_PORT" ]; then
+        echo "Active SSH port: $SSH_PORT"
+    else
+        # 2. Fallback to config parsing if active detection fails
+        echo "Active detection failed. Parsing $SSH_PATH..."
+        if [ -e "$SSH_PATH" ]; then
+            SSH_PORT=$(grep -oP '^Port\s+\K\d+' "$SSH_PATH" | head -n1 || echo "")
+        fi
         
-        if [ -n "$PORT_LINE" ]; then
-            SSH_PORT="$PORT_LINE"
-            echo "Detected SSH port: $SSH_PORT"
+        # 3. Final default to 22
+        if [ -z "$SSH_PORT" ]; then
+            SSH_PORT=22
+            echo "SSH port not detected. Defaulting to: $SSH_PORT"
+        else
+            echo "SSH port from config: $SSH_PORT"
         fi
     fi
 }
 
 # Update fail2ban configuration for SSH
 update_fail2ban_ssh() {
-    # If SSH port is the default 22, no need to modify fail2ban config
-    if [ "$SSH_PORT" = "22" ]; then
-        return
-    fi
-    
     if [ -f "$FAIL2BAN_SSHD_CONF" ]; then
-        # File exists, update the port in the action line
-        if grep -q "action.*port=" "$FAIL2BAN_SSHD_CONF" >/dev/null 2>&1; then
-            # Replace port 22 with the detected port
-            sed -i "s/port=\"22\"/port=\"$SSH_PORT\"/g" "$FAIL2BAN_SSHD_CONF" 2>/dev/null
-            sed -i "s/port=\"22,/port=\"$SSH_PORT,/g" "$FAIL2BAN_SSHD_CONF" 2>/dev/null
-            sed -i "s/,22,/,$SSH_PORT,/g" "$FAIL2BAN_SSHD_CONF" 2>/dev/null
-            sed -i "s/,22\"/,$SSH_PORT\"/g" "$FAIL2BAN_SSHD_CONF" 2>/dev/null
-        else
-            # If no port parameter found in action, add the action line with detected port
-            if grep -q "^\[sshd\]" "$FAIL2BAN_SSHD_CONF" >/dev/null 2>&1; then
-                # If sshd section exists but no port action
-                sed -i "/^\[sshd\]/a action = iptables-multiport[name=sshd, port=\"$SSH_PORT\", protocol=tcp]" "$FAIL2BAN_SSHD_CONF" 2>/dev/null
-            fi
-        fi
+        # Replace the entire action line to ensure correct port and protocol
+        sed -i "s|^action = .*|action = iptables-multiport[name=sshd, port=\"$SSH_PORT\", protocol=tcp]|" "$FAIL2BAN_SSHD_CONF"
+        echo "Fail2ban configured for SSH port $SSH_PORT"
     fi
-    echo "Configured fail2ban for SSH port $SSH_PORT"
 }
 
 # Optimize UFW configuration
@@ -279,44 +242,44 @@ configure_ufw() {
 
 # Setup CompassVPN log directory
 setup_compassvpn_logs() {
-    echo "Setting up CompassVPN log directory..."
+    echo "Setting up log directory..."
 
     # Create the log directory if it doesn't exist
     if [ ! -d "$COMPASSVPN_LOG_PATH" ]; then
-        echo "Creating CompassVPN log directory at $COMPASSVPN_LOG_PATH."
+        echo "Creating log directory at $COMPASSVPN_LOG_PATH."
         mkdir -p "$COMPASSVPN_LOG_PATH"
     fi
 
-    # Set appropriate permissions (777 for directory)
-    echo "Setting permissions for $COMPASSVPN_LOG_PATH."
-    chmod 777 "$COMPASSVPN_LOG_PATH" # Removed trailing dot
+    # Create fail2ban data directory
+    mkdir -p fail2ban/data
+    chmod 777 fail2ban/data
+
+    # Set appropriate permissions (777 for directory to allow Docker volume mounting)
+    chmod 777 "$COMPASSVPN_LOG_PATH"
 
     # Set ownership to root:root (standard for system logs)
-    echo "Setting ownership for $COMPASSVPN_LOG_PATH."
-    chown root:root "$COMPASSVPN_LOG_PATH" # Removed trailing dot
+    chown root:root "$COMPASSVPN_LOG_PATH"
 
-    # Create log files
+    # Create log files and set permissions to 666 (Read/Write for all, no Execute)
     echo "Creating log files..."
-    touch "$COMPASSVPN_LOG_PATH/nginx_access.log"
-    touch "$COMPASSVPN_LOG_PATH/nginx_error.log"
-    touch "$COMPASSVPN_LOG_PATH/xray_access.log"
-    touch "$COMPASSVPN_LOG_PATH/xray_error.log"
-    touch "$COMPASSVPN_LOG_PATH/xray.log"
+    local logs=("nginx_access.log" "nginx_error.log" "xray_access.log" "xray_error.log" "xray.log" "debug.log")
+    for log in "${logs[@]}"; do
+        touch "$COMPASSVPN_LOG_PATH/$log"
+        chmod 666 "$COMPASSVPN_LOG_PATH/$log"
+    done
 
-    # Set log file permissions
-    echo "Setting log file permissions to 777..."
-    chmod 777 "$COMPASSVPN_LOG_PATH/nginx_access.log"
-    chmod 777 "$COMPASSVPN_LOG_PATH/nginx_error.log"
-    chmod 777 "$COMPASSVPN_LOG_PATH/xray_access.log"
-    chmod 777 "$COMPASSVPN_LOG_PATH/xray_error.log"
-    chmod 777 "$COMPASSVPN_LOG_PATH/xray.log"
+    # Setup standard Nginx error log path
+    echo "Setting up Nginx error log..."
+    mkdir -p /var/log/nginx
+    touch /var/log/nginx/error.log
+    chmod 666 /var/log/nginx/error.log
 
-    echo "CompassVPN log directory and files setup completed successfully."
+    echo "Log setup completed."
 }
 
 # Configure logrotate for CompassVPN logs
 setup_logrotate_for_compassvpn() {
-    echo "Configuring logrotate for CompassVPN logs..."
+    echo "Configuring logrotate..."
 
     # Ensure logrotate is installed
     if ! command_exists logrotate; then
@@ -330,6 +293,7 @@ setup_logrotate_for_compassvpn() {
 /var/log/compassvpn/xray_error.log
 /var/log/compassvpn/nginx_access.log
 /var/log/compassvpn/nginx_error.log
+/var/log/compassvpn/debug.log
 /var/log/compassvpn/xray.log {
     size 500M
     rotate 8
@@ -350,7 +314,7 @@ EOF
 
     # Run once to validate config
     logrotate -f /etc/logrotate.conf >/dev/null 2>&1 || true
-    echo "logrotate configured at $lr_file"
+    echo "Logrotate configured."
 }
 
 # Process fail2ban filter with NGINX_PATH
@@ -359,19 +323,24 @@ process_fail2ban_filter() {
     local nginx_path
     
     if [ ! -f "$filter_file" ]; then
-        echo "Error: nginx-bad-request.conf not found at $filter_file."
+        echo "Error: nginx-bad-request.conf not found."
         return 1
     fi
     
     # Extract NGINX_PATH from environment configuration
-    nginx_path=$(grep -oP '^NGINX_PATH=\K.*' env_file)
+    if [ -f "env_file" ]; then
+        nginx_path=$(grep -oP '^NGINX_PATH=\K.*' env_file)
+    else
+        echo "Error: env_file not found."
+        exit 1
+    fi
     
     if [ -z "$nginx_path" ]; then
-        echo "Warning: NGINX_PATH not found in env_file. Using default value."
+        echo "Warning: NGINX_PATH not found. Using default."
         nginx_path="default"
     fi
     
-    echo "Setting NGINX_PATH to $nginx_path in nginx-bad-request.conf"
+    echo "Setting NGINX_PATH to $nginx_path"
     
     # Update filter configuration with environment path
     sed -i "s|NGINX_PATH|$nginx_path|g" "$filter_file"
@@ -381,37 +350,28 @@ process_fail2ban_filter() {
 check_required_ports() {
     local conflict_found=0
 
-    echo "Checking required ports: ${REQUIRED_PORTS[*]}..."
-
     for port in "${REQUIRED_PORTS[@]}"; do
-        echo "Checking if port $port is in use..."
         # Use ss to check for listening sockets on the current TCP port
         local listening_process
         listening_process=$(ss -tlpn "sport = :$port" | grep LISTEN || true)
 
         if [ -n "$listening_process" ]; then
             conflict_found=1
-            echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
-            echo "!! ERROR: Port $port is already in use by the following process: "
+            echo "Error: Port $port is already in use."
             # Attempt to extract process information more reliably
             local pid
             pid=$(echo "$listening_process" | grep -oP 'pid=\K\d+')
             if [ -n "$pid" ]; then
                 local process_name
                 process_name=$(ps -p "$pid" -o comm=)
-                echo "!! PID: $pid, Name: $process_name "
-            else
-                 # Fallback to showing the ss output if PID extraction fails
-                echo "!! $listening_process "
+                echo "Process: $process_name (PID: $pid)"
             fi
-            echo "!! Please stop this process manually before running the script again. "
-            echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
             exit 1
         fi
     done
 
     if [ "$conflict_found" -eq 0 ]; then
-        echo "All required ports (${REQUIRED_PORTS[*]}) are free."
+        echo "All required ports are free."
     fi
 }
 
@@ -420,60 +380,61 @@ echo
 echo "Preparing the VM..."
 echo
 
-check_root
-sleep 0.5
+# Define the sequence of operations
+declare -A STEP_NAMES
+STEP_NAMES=(
+    [check_root]="Checking root privileges"
+    [check_system]="Checking system compatibility"
+    [install_base_packages]="Installing base packages"
+    [check_openvz]="Checking virtualization type"
+    [check_required_ports]="Checking required ports"
+    [fix_etc_hosts]="Configuring hosts file"
+    [fix_dns]="Configuring DNS servers"
+    [set_timezone]="Setting system timezone"
+    [sysctl_optimizations]="Applying network optimizations"
+    [handle_firewalld]="Removing conflicting firewalls"
+    [install_ufw]="Installing UFW"
+    [find_ssh_port]="Detecting SSH port"
+    [update_fail2ban_ssh]="Configuring Fail2ban for SSH"
+    [optimize_ufw]="Optimizing UFW configuration"
+    [configure_ufw]="Configuring firewall rules"
+    [setup_compassvpn_logs]="Setting up log directories"
+    [setup_logrotate_for_compassvpn]="Configuring log rotation"
+    [process_fail2ban_filter]="Configuring Fail2ban filters"
+)
 
-check_system
-sleep 0.5
+STEPS=(
+    check_root
+    check_system
+    install_base_packages
+    check_openvz
+    check_required_ports
+    fix_etc_hosts
+    fix_dns
+    set_timezone
+    sysctl_optimizations
+    handle_firewalld
+    install_ufw
+    find_ssh_port
+    update_fail2ban_ssh
+    optimize_ufw
+    configure_ufw
+    setup_compassvpn_logs
+    setup_logrotate_for_compassvpn
+    process_fail2ban_filter
+)
 
-install_base_packages
-sleep 0.5
-
-check_openvz
-sleep 0.5
-
-check_required_ports
-sleep 0.5
-
-fix_etc_hosts
-sleep 0.5
-
-fix_dns
-sleep 0.5
-
-set_timezone
-sleep 0.5
-
-# Conditionally run sysctl optimizations
-sysctl_optimizations
-sleep 0.5
-
-handle_firewalld
-sleep 0.5
-
-install_ufw
-sleep 0.5
-
-find_ssh_port
-sleep 0.5
-
-update_fail2ban_ssh
-sleep 0.5
-
-optimize_ufw
-sleep 0.5
-
-configure_ufw
-sleep 0.5
-
-setup_compassvpn_logs
-sleep 0.5
-
-setup_logrotate_for_compassvpn
-sleep 0.5
-
-process_fail2ban_filter
-sleep 0.5
+# Execute the sequence with defined intervals
+for step in "${STEPS[@]}"; do
+    echo "Step: ${STEP_NAMES[$step]}"
+    if ! $step; then
+        echo "Error: ${STEP_NAMES[$step]} failed."
+        echo
+        exit 1
+    fi
+    echo
+    sleep 0.5
+done
 
 echo
 echo "VM is ready for bootstrapping."

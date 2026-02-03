@@ -3,6 +3,16 @@
 ENV_FILE="env_file"
 PANEL_PORT="5050"
 
+# --- Helper Functions ---
+
+log_info() {
+    echo "Info: $1"
+}
+
+log_error() {
+    echo "Error: $1"
+}
+
 # Function to check if a command exists
 command_exists() {
     command -v "$1" >/dev/null 2>&1
@@ -15,13 +25,8 @@ setup_firewall() {
         return
     fi
 
-    echo "Checking UFW status and attempting to allow port $PANEL_PORT/tcp..."
-    sudo ufw allow "$PANEL_PORT"/tcp comment "Allow Web Panel"
-    if [ $? -ne 0 ]; then
-        echo "Warning: Failed to add UFW rule for port $PANEL_PORT/tcp." >&2
-    else
-        echo "UFW rule added or already exists for port $PANEL_PORT/tcp."
-    fi
+    log_info "Allowing port $PANEL_PORT/tcp via UFW..."
+    sudo ufw allow "$PANEL_PORT"/tcp comment "Allow Web Panel" >/dev/null 2>&1
 }
 
 # Function to cleanup firewall rule
@@ -29,70 +34,96 @@ cleanup_firewall() {
     if ! command_exists ufw || ! command_exists sudo; then
         return
     fi
-    echo "Attempting to remove UFW rule for port $PANEL_PORT/tcp..."
+    log_info "Cleaning up firewall rules..."
     # We run delete twice because UFW often creates separate v4 and v6 rules with the same comment
     sudo ufw delete allow "$PANEL_PORT"/tcp comment "Allow Web Panel" >/dev/null 2>&1
     sudo ufw delete allow "$PANEL_PORT"/tcp comment "Allow Web Panel" >/dev/null 2>&1
-    echo "Firewall cleanup attempted."
+}
+
+# --- Steps ---
+
+check_env_file() {
+    if [ ! -f "$ENV_FILE" ]; then
+        log_info "Creating $ENV_FILE..."
+        touch "$ENV_FILE"
+        if [ $? -ne 0 ]; then
+            log_error "Failed to create $ENV_FILE."
+            return 1
+        fi
+    fi
+    chmod 600 "$ENV_FILE"
+}
+
+install_dependencies() {
+    log_info "Checking dependencies..."
+    for pkg in python3-flask python3-structlog; do
+        if ! dpkg -s $pkg > /dev/null 2>&1; then
+            log_info "Installing $pkg..."
+            sudo apt-get update -qq
+            sudo apt-get install -yqq $pkg
+            if [ $? -ne 0 ]; then
+                # Fallback to pip if apt package doesn't exist
+                log_info "Trying pip3 for ${pkg#python3-}..."
+                pip3 install -q ${pkg#python3-}
+            fi
+        fi
+    done
+}
+
+run_app() {
+    # Navigate to the script directory
+    cd "$(dirname "$0")"
+    # Set PYTHONPATH to include the project root for shared_lib
+    export PYTHONPATH=$PYTHONPATH:$(pwd)
+
+    if [ -d "web_panel" ]; then
+        log_info "Starting web panel on port $PANEL_PORT..."
+        cd web_panel || return 1
+        python3 app.py
+        FLASK_EXIT_CODE=$?
+        cd ..
+        return $FLASK_EXIT_CODE
+    else
+        log_error "Directory 'web_panel' not found."
+        return 1
+    fi
+}
+
+# --- Main Execution ---
+
+main() {
+    echo "Starting Web Panel setup..."
+    echo
+
+    declare -A STEP_NAMES
+    STEP_NAMES=(
+        [check_env_file]="Configuring environment file"
+        [setup_firewall]="Configuring firewall"
+        [install_dependencies]="Installing dependencies"
+        [run_app]="Running Web Panel"
+    )
+
+    local steps=(
+        check_env_file
+        setup_firewall
+        install_dependencies
+        run_app
+    )
+
+    for step in "${steps[@]}"; do
+        echo "Step: ${STEP_NAMES[$step]}"
+        if ! $step; then
+            echo "Error: ${STEP_NAMES[$step]} failed."
+            echo
+            exit 1
+        fi
+        echo
+        sleep 0.5
+    done
 }
 
 # --- Setup Trap for Cleanup --- 
-# Ensure cleanup_firewall is called when script exits (normally or via interrupt)
 trap cleanup_firewall EXIT SIGINT SIGTERM
 
-# --- Check/Create env_file --- 
-if [ ! -f "$ENV_FILE" ]; then
-  echo "$ENV_FILE not found. Creating empty file."
-  touch "$ENV_FILE"
-  if [ $? -ne 0 ]; then
-    echo "Error: Failed to create $ENV_FILE. Please check permissions." >&2
-    exit 1
-  fi
-fi
-
-# --- Set Permissions --- 
-chmod 600 "$ENV_FILE"
-if [ $? -ne 0 ]; then
-  echo "Warning: Failed to set permissions (600) on $ENV_FILE." >&2
-fi
-
-# --- Setup Firewall --- 
-setup_firewall
-
-# Check if Flask is installed, install if not
-echo "Checking if python3-flask is installed..."
-dpkg -s python3-flask > /dev/null 2>&1
-if [ $? -ne 0 ]; then
-    echo "python3-flask not found. Installing..."
-    sudo apt-get update
-    sudo apt-get install -y python3-flask
-    if [ $? -ne 0 ]; then
-        echo "Failed to install python3-flask. Please install it manually and retry." >&2
-        exit 1
-    fi
-    echo "python3-flask installed successfully."
-else
-    echo "python3-flask is already installed."
-fi
-
-# Navigate to the script directory (where start_panel.sh is)
-cd "$(dirname "$0")"
-
-# --- Run the Flask app --- 
-echo "Starting the web panel on port $PANEL_PORT... Press Ctrl+C to stop."
-# Check if web_panel directory exists
-if [ -d "web_panel" ]; then
-    # Run Flask app from within its directory
-    cd web_panel || exit 1 # Exit if cd fails
-    python3 app.py
-    FLASK_EXIT_CODE=$?
-    cd .. # Go back to the original directory
-else
-    echo "Error: Directory 'web_panel' not found." >&2
-    exit 1
-fi
-
-# --- Exit --- 
-# The cleanup_firewall function is automatically called by the trap on EXIT
-echo "Flask app exited with code: $FLASK_EXIT_CODE"
-exit $FLASK_EXIT_CODE 
+main
+exit $?

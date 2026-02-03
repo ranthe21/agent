@@ -27,6 +27,12 @@ COPY requirements.txt requirements.txt
 
 RUN pip3 install --break-system-packages -r requirements.txt
 
-COPY . /
+COPY common.py common.py
+COPY grafana_agent.py grafana_agent.py
+COPY pushgateway.py pushgateway.py
+COPY run.py run.py
+
+# Create an empty utils.py to satisfy any legacy imports if they exist
+RUN touch utils.py
 
 CMD ["python3", "run.py"]

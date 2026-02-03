@@ -1,3 +1,25 @@
+x-logging-and-limits: &high-perf
+  ulimits:
+    nofile:
+      soft: 65535
+      hard: 65535
+  sysctls:
+    - net.core.somaxconn=8192
+    - net.ipv4.tcp_max_syn_backlog=8192
+    - net.ipv4.tcp_fin_timeout=25
+  logging:
+    driver: "json-file"
+    options:
+      max-size: "10m"
+      max-file: "3"
+
+x-logging-minimal: &minimal-perf
+  logging:
+    driver: "json-file"
+    options:
+      max-size: "5m"
+      max-file: "1"
+
 services:
 
   xray-config:
@@ -5,25 +27,28 @@ services:
       context: ./xray-config
       dockerfile: Dockerfile
     restart: always
+    <<: *minimal-perf
     env_file:
       - env_file
     environment:
       - TZ=UTC
+      - PYTHONPATH=/root
     volumes:
       - "/etc/machine-id:/host/etc/machine-id"
       - "acme:/root/.acme.sh/"
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "1"
+      - "./shared_lib:/root/shared_lib:ro"
+      - "./env_file:/root/env_file:ro"
+      - "/var/log/compassvpn:/var/log/compassvpn:rw"
 
   xray:
     build:
       context: ./xray
       dockerfile: Dockerfile
+    <<: *high-perf
     volumes:
       - "/var/log:/var/log"
+      - "./shared_lib:/shared_lib:ro"
+      - "./env_file:/env_file:ro"
     cap_add:
       - NET_ADMIN
     restart: always
@@ -31,13 +56,9 @@ services:
       - env_file
     environment:
       - TZ=UTC
+      - PYTHONPATH=/:/shared_lib
     depends_on:
       - xray-config
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "1"
     ports:
       - "8080:8080/tcp"
       - "8080:8080/udp"
@@ -48,9 +69,11 @@ services:
     build:
       context: ./nginx
       dockerfile: Dockerfile
+    <<: *high-perf
     volumes:
       - "acme:/root/.acme.sh/"
       - "/var/log:/var/log"
+      - "./shared_lib:/shared_lib:ro"
     restart: always
     env_file:
       - env_file
@@ -64,44 +87,43 @@ services:
       - "8443:8443/udp"
     environment:
       - TZ=UTC
+      - PYTHONPATH=/:/shared_lib
     depends_on:
       - xray
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "1"
 
   xray-exporter:
     build:
       context: ./xray-exporter
       dockerfile: Dockerfile
     restart: always
+    <<: *minimal-perf
     depends_on:
       - xray
     volumes:
       - /var/log/compassvpn:/var/log/compassvpn:ro
+      - "./shared_lib:/shared_lib:ro"
     ports:
       - "9550:9550"
     environment:
       - LOG_LEVEL=info
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "1"
+      - PYTHONPATH=/:/shared_lib
 
   metric-forwarder:
     build:
       context: ./metric-forwarder
       dockerfile: Dockerfile
     restart: always
+    <<: *minimal-perf
     env_file:
       - env_file
     environment:
       - TZ=UTC
+      - PYTHONPATH=/:/shared_lib
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    volumes:
+      - "./shared_lib:/shared_lib:ro"
+      - "./env_file:/env_file:ro"
     depends_on:
       - xray-config
       - node-exporter
@@ -110,6 +132,7 @@ services:
     image: prom/node-exporter:v1.9.1
     restart: always
     network_mode: host
+    <<: *minimal-perf
     volumes:
       - "/proc:/host/proc:ro"
       - "/sys:/host/sys:ro"
@@ -131,11 +154,6 @@ services:
       - '--collector.stat'
       - '--collector.pressure'
       - "--web.listen-address=172.17.0.1:9100" # only allow access from host.docker.internal interface
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "1"
 
   fail2ban:
     build:
@@ -143,21 +161,26 @@ services:
       dockerfile: Dockerfile
     restart: always
     network_mode: host
+    <<: *minimal-perf
     environment:
       - TZ=UTC
+      - F2B_LOG_TARGET=STDOUT
+      - F2B_LOG_LEVEL=NOTICE
+      - LOG_DIR=/var/log/compassvpn
     cap_add:
       - NET_ADMIN
       - NET_RAW
+    healthcheck:
+      test: ["CMD", "fail2ban-client", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
     volumes:
       - "/var/log:/var/log:ro"
+      - "./fail2ban/data:/data"
       - "./fail2ban/jail.d:/etc/fail2ban/jail.d:ro"
       - "./fail2ban/jail.local:/etc/fail2ban/jail.local:ro"
       - "./fail2ban/filter.d:/etc/fail2ban/filter.d:ro"
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "1"
 
 volumes:
   acme:

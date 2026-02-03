@@ -1,28 +1,27 @@
 import os
-import platform
-import threading
+import sys
 from time import sleep
-import requests
-from prometheus_client.parser import text_string_to_metric_families
-from requests.auth import HTTPBasicAuth
-import unicodedata
 
+# Add root to sys.path to allow importing shared_lib
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+from shared_lib.logger import log
 
-# initial wait
-print("initial 30 seconds wait...", flush=True)
+log.info("initial 30 seconds wait...", hypothesisId="INIT")
 # sleep(30)
 
-METRIC_PUSH_METHOD = os.environ.get('METRIC_PUSH_METHOD', 'pushgateway')
+METRIC_PUSH_METHOD = os.environ.get("METRIC_PUSH_METHOD", "pushgateway")
 
 if METRIC_PUSH_METHOD == "pushgateway":
     from pushgateway import run_jobs
+
     run_jobs()
 
 else:
     # grafana_agent method
     from grafana_agent import start
+
     start()
 
 while True:
-    print("entering endless loop.", flush=True)
+    log.info("entering endless loop.", hypothesisId="LOOP")
     sleep(1000)

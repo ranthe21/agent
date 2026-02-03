@@ -22,6 +22,13 @@ fi
 
 DIRECT_SUBDOMAIN=$(curl -s "$UPSTREAM_URL")
 
+# Set Nginx log level based on DEBUG env
+NGINX_LOG_LEVEL="warn"
+if [ "$DEBUG" = "true" ]; then
+    NGINX_LOG_LEVEL="debug"
+fi
+sed -i "s|error_log /var/log/compassvpn/nginx_error.log warn;|error_log /var/log/compassvpn/nginx_error.log $NGINX_LOG_LEVEL;|g" "$NGINX_CONF_PATH"
+
 sed -i "s|\${DIRECT_SUBDOMAIN}|$DIRECT_SUBDOMAIN|g" "$NGINX_CONF_PATH"
 
 nginx -g "daemon off;"

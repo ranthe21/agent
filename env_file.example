@@ -32,4 +32,4 @@ NGINX_FAKE_WEBSITE=www.google.com  # Read More: https://github.com/compassvpn/ag
 
 CUSTOM_DNS=controld #choices: default,cf,controld,custom (e.g. tls+local://my-awesome-dns.com)
 
-DEBUG=disable # choices: enabled, disable (default: disable)
+DEBUG=false # choices: true, false (default: false)
