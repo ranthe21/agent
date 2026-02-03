@@ -1,6 +1,15 @@
+# Ensure all files use LF (Linux) line endings on checkout/commit
 * text=auto eol=lf
+
+# Explicitly force LF for execution-critical files
 *.sh text eol=lf
 *.py text eol=lf
-*.yml text eol=lf
-*.yaml text eol=lf
+
+# Configuration and Infrastructure
+env_file text eol=lf
+env_file.example text eol=lf
+docker-compose.yml text eol=lf
 *.json text eol=lf
+
+# Documentation
+*.md text eol=lf
