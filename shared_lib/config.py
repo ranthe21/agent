@@ -6,7 +6,9 @@ from .paths import ENV_FILE
 from shared_lib.logger import log
 
 
-def load_env(file_path: str = str(ENV_FILE), include_os_environ: bool = True) -> Dict[str, str]:
+def load_env(
+    file_path: str = str(ENV_FILE), include_os_environ: bool = True
+) -> Dict[str, str]:
     """Reads key-value pairs from an env file, optionally including os.environ."""
     env_vars: Dict[str, str] = {}
 
@@ -86,3 +88,21 @@ def write_env(
     except Exception as e:
         log.error(f"Error writing {file_path}: {e}", hypothesisId="CFG")
         raise e
+
+
+def get_identifier() -> str:
+    """
+    Retrieves the system identifier from environment variables or config file.
+    Note: Stays in config.py to prevent circular imports with logger and system modules.
+    """
+    identifier = os.environ.get("IDENTIFIER")
+    if not identifier:
+        # Check if we can load it from env_file if not in environment
+        env_config = load_env()
+        identifier = env_config.get("IDENTIFIER")
+
+    if not identifier:
+        raise RuntimeError(
+            "Critical system error: 'IDENTIFIER' not found in environment or configuration file."
+        )
+    return identifier.lower()
