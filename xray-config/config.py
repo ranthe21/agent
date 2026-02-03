@@ -52,11 +52,14 @@ cert_public = ""
 cert_private = ""
 initialized = False
 
-server_ip_raw = get_public_ip()
-if isinstance(server_ip_raw, dict):
-    server_ip = server_ip_raw["ip"]
-else:
-    server_ip = str(server_ip_raw) if server_ip_raw else "0.0.0.0"
+server_ip = env_config.get("SERVER_IP")
+if not server_ip:
+    server_ip_raw = get_public_ip()
+    if isinstance(server_ip_raw, dict):
+        server_ip = server_ip_raw.get("ip", "Unknown")
+    else:
+        server_ip = str(server_ip_raw) if server_ip_raw else "Unknown"
+
 log.debug("Server IP", hypothesisId="B", ip=server_ip)
 
 
@@ -152,7 +155,7 @@ def create_cf_records():
     return name if res1 and res2 else None
 
 
-if cf_api_token and cf_zone_id:
+if cf_api_token and cf_zone_id and server_ip != "Unknown":
     get_domain()
     if domain:
         a_record = create_cf_records()
