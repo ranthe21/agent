@@ -9,7 +9,10 @@ from shared_lib.logger import log
 
 
 def parse_config_link(link: str) -> Dict[str, Any]:
-    """Parses Xray config links (vmess, vless)."""
+    """
+    Parses Xray config links (vmess, vless).
+    Standardized to return 'id' as the primary identifier (consistent across protocols).
+    """
     if link.startswith("vmess://"):
         b64_data = link[8:]
         # Fix padding if necessary
