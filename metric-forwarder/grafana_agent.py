@@ -11,5 +11,5 @@ from shared_lib.logger import log
 def start():
     generate_config()
     exec_command(["cat", "config.yaml"], capture_output=True)
-    log.info("running grafana-agent", hypothesisId="GRAFANA")
+    log.info("running grafana-agent", hypothesisId="METRIC")
     exec_command(["grafana-agent", "--config.file=config.yaml"])

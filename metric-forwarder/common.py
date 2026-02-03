@@ -25,7 +25,7 @@ if remote_write_url and not remote_write_url.endswith("/push"):
     remote_write_url += "/push"
 
 
-def generate_config():
+def generate_config() -> None:
     config = {
         "server": {
             "log_level": "debug" if env_config.get("DEBUG") == "true" else "warn"
