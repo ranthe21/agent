@@ -1,7 +1,8 @@
 #!/usr/bin/bash
 
-git stash
+# Force local to match remote exactly
+git fetch --all
+git reset --hard origin/main
 
-git pull
-
-
+# Ensure all scripts stay executable
+chmod +x *.sh

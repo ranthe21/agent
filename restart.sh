@@ -13,3 +13,6 @@ fi
 
 # The single source of truth for a clean update
 docker compose up -d --build --remove-orphans
+
+# Clean up old images to save disk space
+docker image prune -f
