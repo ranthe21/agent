@@ -161,7 +161,7 @@ class XrayConfig:
         self.nginx_path = self.env_config.get("NGINX_PATH")
         self.xray_inbounds = self.env_config.get(
             "XRAY_INBOUNDS",
-            "vmess-ws-cdn,vless-tcp-tls-direct,vless-hu-tls-direct,vless-hu-tls-cdn,vless-xhttp-quic-direct,vless-xhttp-quic-cdn",
+            "vmess-ws-cdn,vless-tcp-tls-direct,vless-hu-tls-direct,vless-hu-tls-cdn,vless-xhttp-quic-direct,vless-xhttp-quic-cdn,vless-xhttp-direct,vless-xhttp-cdn",
         ).split(",")
 
         log.debug(
@@ -232,7 +232,7 @@ class XrayConfig:
                         )
                     else:
                         log.debug("Cert missing, issuing", hypothesisId="CERT")
-                        if run_acme("--register-account -m my@example.com"):
+                        if run_acme(f"{ssl_provider_server} --register-account -m my@email.com"):
                             run_acme(
                                 f"{ssl_provider_server} --issue --dns dns_cf -d {self.direct_subdomain}"
                             )
@@ -425,6 +425,8 @@ Endpoint = engage.cloudflareclient.com:2408
                         "vless-hu-tls-cdn",
                         "vless-xhttp-quic-direct",
                         "vless-xhttp-quic-cdn",
+                        "vless-xhttp-direct",
+                        "vless-xhttp-cdn",
                     ],
                     "balancerTag": "balancer1",
                 },
