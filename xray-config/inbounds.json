@@ -187,7 +187,8 @@
         "streamSettings": {
           "network": "xhttp",
           "xhttpSettings": {
-            "path": "/$nginx_path"
+            "path": "/$nginx_path",
+            "mode": "auto"
           }
         },
         "sniffing": {
@@ -220,7 +221,76 @@
         "streamSettings": {
           "network": "xhttp",
           "xhttpSettings": {
-            "path": "/$nginx_path/cdn"
+            "path": "/$nginx_path/cdn",
+            "mode": "auto"
+          }
+        },
+        "sniffing": {
+          "enabled": true,
+          "destOverride": [
+            "http",
+            "tls",
+            "quic"
+          ]
+        }
+      }
+    },
+    {
+      "name": "vless-xhttp-direct",
+      "link": "vless://$config_id@$direct_subdomain:8880?type=xhttp&mode=auto&host=$direct_subdomain&path=%2F$nginx_path&security=none#vless-xhttp-direct",
+      "cloudflare": false,
+      "inbound": {
+        "tag": "vless-xhttp-direct",
+        "listen": "0.0.0.0",
+        "port": 8004,
+        "protocol": "vless",
+        "settings": {
+          "clients": [
+            {
+              "id": "$config_id"
+            }
+          ],
+          "decryption": "none"
+        },
+        "streamSettings": {
+          "network": "xhttp",
+          "xhttpSettings": {
+            "path": "/$nginx_path",
+            "host": "$direct_subdomain"
+          }
+        },
+        "sniffing": {
+          "enabled": true,
+          "destOverride": [
+            "http",
+            "tls",
+            "quic"
+          ]
+        }
+      }
+    },
+    {
+      "name": "vless-xhttp-cdn",
+      "link": "vless://$config_id@$cf_clean_ip_domain:8880?type=xhttp&mode=auto&host=$subdomain&path=%2F$nginx_path%2Fcdn&security=none#vless-xhttp-cdn",
+      "cloudflare": true,
+      "inbound": {
+        "tag": "vless-xhttp-cdn",
+        "listen": "0.0.0.0",
+        "port": 8044,
+        "protocol": "vless",
+        "settings": {
+          "clients": [
+            {
+              "id": "$config_id"
+            }
+          ],
+          "decryption": "none"
+        },
+        "streamSettings": {
+          "network": "xhttp",
+          "xhttpSettings": {
+            "path": "/$nginx_path/cdn",
+            "host": "$subdomain"
           }
         },
         "sniffing": {

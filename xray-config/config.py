@@ -161,7 +161,7 @@ class XrayConfig:
         self.nginx_path = self.env_config.get("NGINX_PATH")
         self.xray_inbounds = self.env_config.get(
             "XRAY_INBOUNDS",
-            "vmess-ws-cdn,vless-tcp-tls-direct,vless-hu-tls-direct,vless-hu-tls-cdn,vless-xhttp-quic-direct,vless-xhttp-quic-cdn",
+            "vmess-ws-cdn,vless-tcp-tls-direct,vless-hu-tls-direct,vless-hu-tls-cdn,vless-xhttp-quic-direct,vless-xhttp-quic-cdn,vless-xhttp-direct,vless-xhttp-cdn",
         ).split(",")
 
         log.debug(
@@ -425,6 +425,8 @@ Endpoint = engage.cloudflareclient.com:2408
                         "vless-hu-tls-cdn",
                         "vless-xhttp-quic-direct",
                         "vless-xhttp-quic-cdn",
+                        "vless-xhttp-direct",
+                        "vless-xhttp-cdn",
                     ],
                     "balancerTag": "balancer1",
                 },

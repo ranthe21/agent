@@ -73,7 +73,7 @@ except Exception as e:
     ]
     cdn_options = [
         {"name": n, "label": n}
-        for n in ["vmess-ws-cdn", "vless-hu-tls-cdn", "vless-xhttp-quic-cdn"]
+        for n in ["vmess-ws-cdn", "vless-hu-tls-cdn", "vless-xhttp-quic-cdn", "vless-xhttp-cdn"]
     ]
     xray_inbounds_default = [
         "vmess-ws-cdn",
@@ -82,6 +82,8 @@ except Exception as e:
         "vless-xhttp-quic-direct",
         "vless-hu-tls-cdn",
         "vless-xhttp-quic-cdn",
+        "vless-xhttp-direct",
+        "vless-xhttp-cdn",
     ]
 
 CONFIG_SCHEMA: List[Dict[str, Any]] = [
