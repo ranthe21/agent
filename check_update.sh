@@ -1,7 +1,5 @@
 #!/usr/bin/bash
 
-git stash
-
 # Fetch the latest changes from the remote
 git fetch
 
