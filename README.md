@@ -74,8 +74,5 @@ NGINX webserver to manage Xray inbounds and fallbacks, enhancing both performanc
 ### `metric-forwarder`
 Reads metrics from `xray-config`, `node-exporter`, and `v2ray-exporter` services and pushes them to a remote manager `Pushgateway` service or `Grafana Cloud Prometheus` endpoint.
 
-### `fail2ban`
-Protects the server against brute force attacks by monitoring logs and automatically blocking suspicious IPs.
-
 ### `user-metrics`
 Tracks approximate active unique users across all configured inbounds and monitors blocked requests due to junk traffic, providing insights into bandwidth optimization.
