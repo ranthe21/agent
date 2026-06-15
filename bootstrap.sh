@@ -47,14 +47,18 @@ install_docker() {
 
 # Generate and add unique identifier
 add_identifier() {
+    if [ -n "$IDENTIFIER" ]; then
+        echo "Identifier already exists: $IDENTIFIER"
+        return 0
+    fi
+
     echo "Generating unique identifier..."
     local identifier=$(head /dev/urandom | tr -dc 'a-zA-Z0-9' | head -c 10)
     if [ $? -ne 0 ]; then
         echo "Error: Failed to generate unique identifier."
         exit 1
     fi
-    
-    echo "Creating a new identifier and appending to the env_file..."
+
     echo "" >> ./env_file
     echo "IDENTIFIER=$identifier" >> ./env_file
     echo "Added identifier: $identifier"
