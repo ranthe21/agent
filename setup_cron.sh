@@ -117,12 +117,26 @@ generate_cron_jobs() {
 
 # --- Main Execution ---
 
+ensure_cron_installed() {
+    if ! command -v crontab >/dev/null 2>&1; then
+        log_info "crontab not found. Installing cron..."
+        apt-get update -qq && apt-get install -yqq cron
+        if ! command -v crontab >/dev/null 2>&1; then
+            log_error "Failed to install cron."
+            return 1
+        fi
+        systemctl enable cron >/dev/null 2>&1 || true
+        systemctl start cron >/dev/null 2>&1 || true
+    fi
+}
+
 main() {
     echo "Setting up cron jobs..."
     echo
 
     declare -A STEP_NAMES
     STEP_NAMES=(
+        [ensure_cron_installed]="Ensuring cron is installed"
         [fetch_crontab]="Fetching current crontab"
         [remove_managed_blocks]="Removing old managed blocks"
         [remove_stray_jobs]="Removing stray bootstrap and log jobs"
@@ -131,6 +145,7 @@ main() {
     )
 
     local steps=(
+        ensure_cron_installed
         fetch_crontab
         remove_managed_blocks
         remove_stray_jobs
