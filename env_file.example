@@ -24,7 +24,7 @@ XRAY_OUTBOUND=direct
 
 # Inbounds to enable (comma-separated). Append :<count> for replicas via path-based
 # routing, e.g. vless-hu-tls-cdn:3
-XRAY_INBOUNDS=vless-tcp-tls-direct,vless-hu-tls-direct,vless-xhttp-quic-direct
+XRAY_INBOUNDS=vless-tcp-tls-direct,vless-tcp-reality-direct,vless-hu-tls-direct,vless-xhttp-quic-direct
 
 # TLS certificate authority: "letsencrypt" or "zerossl".
 SSL_PROVIDER=letsencrypt
@@ -35,8 +35,9 @@ AUTO_UPDATE=off
 # The secret URL path that carries real proxy traffic - everything else hits the decoy.
 NGINX_PATH=compass
 
-# The decoy website shown to anyone who isn't a real client.
-NGINX_FAKE_WEBSITE=www.divar.ir
+# The decoy website shown to anyone who isn't a real client, also used to
+# disguise the reality inbound.
+FAKE_WEBSITE=www.divar.ir
 
 # DNS resolver for outbound lookups: "default", "cf", "controld", or a full
 # https+local:// / quic+local:// URL.
