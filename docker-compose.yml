@@ -244,3 +244,15 @@ volumes:
   # GeoIP dbs the xray-exporter downloads on startup - kept so we don't re-fetch
   # them from GitHub on every restart.
   xray_geoip:
+
+# Give the default bridge IPv6 so the direct inbounds (reality on 2083/2087 and
+# 443) see real client v6 addresses via ip6tables DNAT, instead of collapsing
+# them to the bridge gateway 172.18.0.1 through docker-proxy. The ULA subnet is
+# internal-only (host<->container), unrelated to the server's public IPv6.
+networks:
+  default:
+    enable_ipv6: true
+    ipam:
+      config:
+        - subnet: 172.18.0.0/16
+        - subnet: fd00:c0:ffee::/64
