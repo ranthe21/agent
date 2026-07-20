@@ -1,6 +1,6 @@
 import json
 import threading
-from typing import Dict, List, Optional, Union
+from typing import Dict, Optional, Union
 from flask import Flask, abort
 
 from config import config
@@ -24,7 +24,7 @@ def _prom_label_escape(value: object) -> str:
 class XrayService:
     def __init__(self) -> None:
         self.app: Flask = Flask(__name__)
-        self.valid_configs: Dict[str, List[str]] = {}
+        self.valid_configs: Dict[str, Dict[str, str]] = {}
         self.latest_metrics: str = ""
         self.instance_location_info: Optional[Union[str, Dict[str, str]]] = None
         self._shutdown_event: threading.Event = threading.Event()
@@ -75,7 +75,7 @@ class XrayService:
         def metrics():
             return self.latest_metrics
 
-    def update_metrics(self, configs: Dict[str, List[str]]) -> bool:
+    def update_metrics(self, configs: Dict[str, Dict[str, str]]) -> bool:
         if not self.instance_location_info:
             self.instance_location_info = get_public_ip(extra=True)
 
@@ -95,8 +95,8 @@ class XrayService:
         failed_count = 0
         for config_link, value in configs.items():
             try:
-                status = value[1]
-                delay = value[5]
+                status = value["status"]
+                delay = value["delay"]
 
                 config_info = parse_config_link(config_link)
                 labels = [
@@ -182,17 +182,27 @@ class XrayService:
                 "http",
                 "--thread",
                 "6",
-                "-d",
+                "--mdelay",
                 "10000",
-                "-f",
+                # One retry so a transient blip does not flap a config to down
+                # for the whole cycle.
+                "--retries",
+                "1",
+                # We only test vmess/vless; pin the core instead of auto-detect.
+                "--core",
+                "xray",
+                # Skip the per-config real-IP lookup; unused (instance IP comes
+                # from get_public_ip) and it adds a request per config.
+                "--rip=false",
+                "--file",
                 str(CONFIGS_CSV),
-                "-o",
+                "--out",
                 str(VALID_CSV),
-                "-x",
+                "--type",
                 "csv",
             ]
             if is_debug():
-                knife_cmd.append("-v")
+                knife_cmd.append("--verbose")
             exec_command(knife_cmd)
 
             self.valid_configs = csv_to_dict(str(VALID_CSV))
