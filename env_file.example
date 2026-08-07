@@ -19,8 +19,16 @@ CF_API_TOKEN=
 CF_ZONE_ID=
 CF_CLEAN_IP_DOMAIN=
 
-# Egress mode: "direct", or "warp" to route out through a WireGuard/WARP tunnel.
+# Egress mode: "direct", "warp" or "warp-selective". With "warp" all outbound
+# traffic goes through Cloudflare WARP, one WARP per inbound. With
+# "warp-selective" only what you list in WARP_DOMAINS goes through WARP, the
+# rest goes direct.
 XRAY_OUTBOUND=direct
+
+# Only used when XRAY_OUTBOUND=warp-selective. The domains and services you want
+# to send through WARP, comma-separated, e.g. geosite:spotify,gemini.google.com
+# Empty falls back to direct.
+WARP_DOMAINS=
 
 # Inbounds to enable (comma-separated). Append :<count> for replicas via path-based
 # routing, e.g. vless-hu-tls-cdn:3
