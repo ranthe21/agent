@@ -23,8 +23,8 @@
     # Upstream DNS resolvers, in priority order. Each is probed first and only the
     # reachable ones are applied, so we never replace working DNS with dead entries.
     dns_servers:
-      - "1.1.1.2"
       - "127.0.0.53"
+      - "1.1.1.2"
 
     # Ports opened on the host firewall. The metrics ports (29100, 25000, 29550)
     # are intentionally NOT here - they are bound to loopback and scraped over
