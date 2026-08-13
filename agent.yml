@@ -322,7 +322,7 @@
             mode: "0644"
             content: |
               /var/log/compassvpn/*.log {
-                  size 500M
+                  size 100M
                   rotate 2
                   compress
                   delaycompress
@@ -332,6 +332,12 @@
                   dateext
                   dateformat -%Y%m%d-%s
               }
+
+        - name: Check the size rule hourly, since logrotate.timer only runs daily
+          ansible.builtin.cron:
+            name: compassvpn-logrotate
+            special_time: hourly
+            job: "/usr/sbin/logrotate /etc/logrotate.d/compassvpn"
 
         - name: Enable and start logrotate.timer when available
           ansible.builtin.systemd_service:
