@@ -14,7 +14,7 @@ import requests
 
 from shared_lib.network import get_public_ip
 from shared_lib.xray import register_warp
-from shared_lib.config import load_env, get_identifier
+from shared_lib.config import load_env, get_identifier, env_flag
 from shared_lib.system import exec_command
 from shared_lib.logger import log, is_debug
 from shared_lib.paths import (
@@ -29,6 +29,16 @@ from shared_lib.paths import (
 # hang startup forever.
 CF_API_TIMEOUT = (10, 30)
 
+
+# Tor's default exit policy (spam, usenet, SMB, old P2P) plus telnet, adb,
+# memcached and 2525. 465 and 587 stay open so mail clients still work.
+ABUSE_PORTS = (
+    "23,25,119,135-139,445,563,1214,2525,4661-4666,5555,"
+    "6346-6429,6699,6881-6999,11211"
+)
+
+CF_DNS = "https+local://security.cloudflare-dns.com/dns-query"
+CONTROLD_DNS = "https+local://freedns.controld.com/no-ads-dating-drugs-gambling-malware-typo"
 
 # Inbounds that bind a port directly (no HTTP path) — replicas not supported
 _NO_REPLICA_SUPPORT = {"vless-tcp-tls-direct", "vless-tcp-reality-direct", "vless-xhttp-reality-direct"}
@@ -153,6 +163,7 @@ class XrayConfig:
         """Initialize instance attributes to hold shared variables."""
         self.env_config: Dict[str, str] = {}
         self.is_debug_enabled: bool = False
+        self.anti_abuse: bool = False
         self.config_id: str = ""
         self.config_uuid: str = ""
         self.cf_api_token: Optional[str] = None
@@ -372,6 +383,7 @@ class XrayConfig:
 
         self.env_config = load_env()
         self.is_debug_enabled = is_debug()
+        self.anti_abuse = env_flag("ANTI_ABUSE")
         log.debug(
             "Loaded env_config", hypothesisId="CFG", keys=list(self.env_config.keys())
         )
@@ -684,6 +696,51 @@ class XrayConfig:
             ]
         )
 
+        # One tag per category so the stats say what got dropped. Domain and port
+        # rules go before the ip ones: first match wins, so they skip the DNS
+        # lookup IPOnDemand needs.
+        block_rules: List[Dict[str, Any]] = [
+            {
+                "outboundTag": "blocked",
+                "domain": [
+                    "geosite:private",
+                    "regexp:.*\\.ir$",
+                    "regexp:.*\\.xn--mgba3a4f16a$",
+                    "ext:geosite_IR.dat:ir",
+                ],
+            },
+            {"outboundTag": "abuse-torrent", "protocol": ["bittorrent"]},
+            {
+                "outboundTag": "blocked-ads",
+                "domain": ["ext:geosite_IR.dat:category-ads-all"],
+            },
+            {
+                "outboundTag": "abuse-malware",
+                "domain": [
+                    "ext:geosite_IR.dat:malware",
+                    "ext:geosite_IR.dat:phishing",
+                    "ext:geosite_IR.dat:cryptominers",
+                ],
+            },
+        ]
+
+        if self.anti_abuse:
+            block_rules.append(
+                {"outboundTag": "abuse-port", "network": "tcp", "port": ABUSE_PORTS}
+            )
+            log.info(
+                f"Anti-abuse on: blocking outbound TCP {ABUSE_PORTS}",
+                hypothesisId="CFG",
+            )
+
+        block_rules += [
+            {"outboundTag": "blocked", "ip": ["geoip:private", "ext:geoip_IR.dat:ir"]},
+            {
+                "outboundTag": "abuse-malware",
+                "ip": ["ext:geoip_IR.dat:phishing", "ext:geoip_IR.dat:malware"],
+            },
+        ]
+
         self.xray_config = {
             "log": {
                 "access": str(XRAY_ACCESS_LOG),
@@ -692,33 +749,13 @@ class XrayConfig:
                 "dnsLog": self.is_debug_enabled,
             },
             "routing": {
-                "domainStrategy": "AsIs",
-                "rules": [
-                    {"inboundTag": ["doko"], "outboundTag": "api"},
-                    {
-                        "outboundTag": "blocked",
-                        "ip": [
-                            "geoip:private",
-                            "ext:geoip_IR.dat:ir",
-                            "ext:geoip_IR.dat:phishing",
-                            "ext:geoip_IR.dat:malware",
-                        ],
-                    },
-                    {"outboundTag": "blocked", "protocol": ["bittorrent"]},
-                    {
-                        "outboundTag": "blocked",
-                        "domain": [
-                            "geosite:private",
-                            "regexp:.*\\.ir$",
-                            "regexp:.*\\.xn--mgba3a4f16a$",
-                            "ext:geosite_IR.dat:ir",
-                            "ext:geosite_IR.dat:category-ads-all",
-                            "ext:geosite_IR.dat:malware",
-                            "ext:geosite_IR.dat:phishing",
-                            "ext:geosite_IR.dat:cryptominers",
-                        ],
-                    },
-                ],
+                # AsIs never matched ip rules against a domain, so anything aimed
+                # at the LAN or 169.254.169.254 walked through. IPIfNonMatch is no
+                # good either: the inboundTag warp rules always match, so its
+                # second pass never runs.
+                "domainStrategy": "IPOnDemand",
+                "rules": [{"inboundTag": ["doko"], "outboundTag": "api"}]
+                + block_rules,
             },
             "dns": None,
             "inbounds": inbounds_list,
@@ -739,13 +776,13 @@ class XrayConfig:
         }
 
         # Custom DNS configuration
-        custom_dns_config = self.env_config.get("CUSTOM_DNS", "default")
-        if custom_dns_config != "default":
-            dns_server = None
+        custom_dns_config = self.env_config.get("CUSTOM_DNS", "default").strip()
+        dns_server = None
+        if custom_dns_config not in ("", "default"):
             if custom_dns_config == "cf":
-                dns_server = "https+local://security.cloudflare-dns.com/dns-query"
+                dns_server = CF_DNS
             elif custom_dns_config == "controld":
-                dns_server = "https+local://freedns.controld.com/no-ads-dating-drugs-gambling-malware-typo"
+                dns_server = CONTROLD_DNS
             elif custom_dns_config.startswith(
                 ("https+local://", "quic+local://", "tls+local://")
             ):
@@ -756,17 +793,22 @@ class XrayConfig:
                     ipaddress.IPv4Address(custom_dns_config)
                     dns_server = custom_dns_config
                 except ValueError:
-                    pass
-            if dns_server:
-                self.xray_config["dns"] = {
-                    "servers": [dns_server],
-                    "queryStrategy": "UseIPv4",
-                }
-            else:
-                log.warning(
-                    f"CUSTOM_DNS value {custom_dns_config!r} is not a supported format; using default DNS",
-                    hypothesisId="CFG",
-                )
+                    log.warning(
+                        f"CUSTOM_DNS value {custom_dns_config!r} is not a supported format; using default DNS",
+                        hypothesisId="CFG",
+                    )
+
+        # Keep whatever the operator picked. The node's own resolver and cf get
+        # swapped for ControlD, which filters more.
+        if self.anti_abuse and dns_server in (None, CF_DNS):
+            dns_server = CONTROLD_DNS
+            log.info("Anti-abuse on: using the ControlD resolver", hypothesisId="CFG")
+
+        if dns_server:
+            self.xray_config["dns"] = {
+                "servers": [dns_server],
+                "queryStrategy": "UseIPv4",
+            }
 
         # WARP configuration. "warp" gives every inbound its own tunnel;
         # "warp-selective" keeps one shared tunnel and only sends WARP_DOMAINS
@@ -847,8 +889,6 @@ Endpoint = engage.cloudflareclient.com:2408
                         }
                     )
             else:
-                self.xray_config["routing"]["domainStrategy"] = "IPOnDemand"
-
                 # Appended for the same reason as the selective rule above. An
                 # inboundTag-only rule matches everything from that inbound, so
                 # putting these first shadowed every block rule below them and
@@ -882,8 +922,17 @@ Endpoint = engage.cloudflareclient.com:2408
         else:
             self.xray_config["outbounds"].append(direct_outbound)
 
+        # All of them always, even unused ones, so the stats series don't come
+        # and go.
         self.xray_config["outbounds"] += [
-            {"tag": "blocked", "protocol": "blackhole", "settings": {}}
+            {"tag": tag, "protocol": "blackhole", "settings": {}}
+            for tag in (
+                "blocked",
+                "blocked-ads",
+                "abuse-torrent",
+                "abuse-malware",
+                "abuse-port",
+            )
         ]
 
         if not active_inbounds:
